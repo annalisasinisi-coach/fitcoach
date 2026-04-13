@@ -1293,6 +1293,9 @@ async function loadUserData(){
       }
       // Never cache scheda in localStorage — always read from DB
       localStorage.removeItem('asfc4_meso');localStorage.removeItem('asfc3_meso');
+      // Load exercises library (needed to show videos in workout)
+      const libData = await dbAll('esercizi');
+      if(libData.length) exerciseLibrary=libData.map(e=>({id:e.id,name:e.nome,cat:e.categoria||'',video:e.video_url||'',desc:e.descrizione||''}));
       // Load macros
       const {data:pianoRows}=await supa.from('piani_alimentari').select('*').eq('cliente_id',user.id).limit(1);
       if(pianoRows?.length){
@@ -2768,38 +2771,63 @@ async function viewClient(clientId, clientName){
     html+=`<div style="margin-bottom:18px"><div style="font-size:11px;text-transform:uppercase;letter-spacing:0.06em;color:var(--text3);font-weight:600;margin-bottom:8px">📋 SCHEDA</div>`;
     if(scheda?.length){
       const s=scheda[0];
-      const giorniHtml=(s.giorni||[]).map((g,gi)=>{
-        const exHtml=(g.esercizi||[]).map((ex,ei)=>`
-          <div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border)">
-            <div style="width:22px;height:22px;border-radius:50%;background:var(--rose-pale);color:var(--rose);font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">${ei+1}</div>
+      const uid=`sch_${clientId.slice(0,8)}`;
+      const totEx=(s.giorni||[]).reduce((t,g)=>t+(g.esercizi||[]).length,0);
+      const giorniAccordion=(s.giorni||[]).map((g,gi)=>{
+        const exRows=(g.esercizi||[]).map((ex,ei)=>`
+          <div style="display:flex;align-items:flex-start;gap:8px;padding:5px 0;border-bottom:1px solid var(--border)">
+            <div style="width:20px;height:20px;border-radius:50%;background:var(--rose-pale);color:var(--rose);font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px">${ei+1}</div>
             <div style="flex:1;min-width:0">
-              <div style="font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${ex.name}</div>
-              <div style="font-size:11px;color:var(--text2)">${ex.sets} × ${ex.reps} · Rec: ${ex.recupero||'—'} · RPE ${ex.rpe||'—'}</div>
+              <div style="font-size:12px;font-weight:600">${ex.name}</div>
+              <div style="font-size:11px;color:var(--text2)">${ex.sets}×${ex.reps} · Rec ${ex.recupero||'—'} · RPE ${ex.rpe||'—'}</div>
               ${ex.note?`<div style="font-size:10px;color:var(--text3);font-style:italic">${ex.note}</div>`:''}
             </div>
           </div>`).join('');
-        return `<div style="background:var(--warm);border-radius:var(--r);padding:10px 12px;margin-bottom:6px">
-          <div style="display:flex;align-items:center;gap:8px;margin-bottom:${g.tipo==='riposo'?'0':'8px'}">
-            <span style="font-size:11px;font-weight:700;background:${g.tipo==='riposo'?'var(--peach-pale)':'var(--rose-pale)'};color:${g.tipo==='riposo'?'#C07040':'var(--rose)'};padding:2px 8px;border-radius:10px">${g.label}</span>
-            <span style="font-size:12px;font-weight:600">${g.nome||''}</span>
-            ${g.tipo==='riposo'?'<span style="font-size:11px;color:var(--text3)">😴 Riposo</span>':''}
+        const acId=`${uid}_g${gi}`;
+        const isRest=g.tipo==='riposo';
+        return `<div style="border:1.5px solid var(--border);border-radius:var(--r);margin-bottom:5px;overflow:hidden">
+          <button onclick="(function(el,body){body.style.display=body.style.display==='none'?'block':'none';el.querySelector('.acc-arrow').textContent=body.style.display==='none'?'▶':'▼'})(this,document.getElementById('${acId}'))" style="width:100%;background:var(--warm);border:none;padding:9px 12px;display:flex;align-items:center;gap:8px;cursor:pointer;text-align:left">
+            <span style="font-size:10px;font-weight:700;background:${isRest?'var(--peach-pale)':'var(--rose-pale)'};color:${isRest?'#C07040':'var(--rose)'};padding:2px 7px;border-radius:8px;flex-shrink:0">${g.label}</span>
+            <span style="font-size:12px;font-weight:600;flex:1">${g.nome||''}${isRest?' 😴':''}</span>
+            ${!isRest?`<span style="font-size:11px;color:var(--text3)">${(g.esercizi||[]).length} es.</span>`:''}
+            <span class="acc-arrow" style="font-size:10px;color:var(--text3);margin-left:4px">▶</span>
+          </button>
+          <div id="${acId}" style="display:none;padding:8px 12px;background:#fff">
+            ${isRest?'<div style="font-size:12px;color:var(--text3);font-style:italic;padding:4px 0">Giorno di riposo</div>':exRows}
+            ${g.note&&!isRest?`<div style="font-size:11px;color:var(--text2);margin-top:6px;padding-top:6px;border-top:1px solid var(--border)">📝 ${g.note}</div>`:''}
           </div>
-          ${g.tipo!=='riposo'?exHtml:''}
-          ${g.note&&g.tipo!=='riposo'?`<div style="font-size:11px;color:var(--text2);margin-top:6px;padding-top:6px;border-top:1px solid var(--border)">📝 ${g.note}</div>`:''}
         </div>`;
       }).join('');
       html+=`<div style="background:linear-gradient(135deg,var(--violet-pale),var(--rose-pale));border-radius:var(--r);padding:10px 14px;margin-bottom:8px">
         <div style="font-weight:600;margin-bottom:2px">${s.nome}</div>
-        <div style="font-size:12px;color:var(--text2);margin-bottom:10px">Sett. ${s.current_week||1}/${s.weeks||4} · ${s.giorni?.length||0} giorni · ${(s.giorni||[]).reduce((tot,g)=>tot+(g.esercizi||[]).length,0)} esercizi totali</div>
-        ${giorniHtml}
-        ${s.note_globali?`<div style="font-size:11px;color:var(--text2);margin-top:8px;padding-top:8px;border-top:1px solid rgba(0,0,0,0.08)">📋 Note: ${s.note_globali}</div>`:''}
+        <div style="font-size:12px;color:var(--text2);margin-bottom:10px">${s.weeks||4} settimane · ${(s.giorni||[]).length} giorni · ${totEx} esercizi</div>
+        ${giorniAccordion}
+        ${s.note_globali?`<div style="font-size:11px;color:var(--text2);margin-top:8px;padding-top:8px;border-top:1px solid rgba(0,0,0,0.1)">📋 Note: ${s.note_globali}</div>`:''}
       </div>`;
     }
     else html+=`<div style="font-size:13px;color:var(--text3);font-style:italic">Nessuna scheda assegnata</div>`;
     html+='</div>';
-    // Check-in
-    html+=`<div style="margin-bottom:18px"><div style="font-size:11px;text-transform:uppercase;letter-spacing:0.06em;color:var(--text3);font-weight:600;margin-bottom:8px">📊 ULTIMI CHECK-IN</div>`;
-    if(ci?.length){ci.forEach(c=>{html+=`<div style="background:var(--warm);border-radius:var(--r);padding:8px 12px;margin-bottom:5px;font-size:12px;display:flex;gap:12px;flex-wrap:wrap"><span style="font-weight:600">${new Date(c.data_checkin).toLocaleDateString('it-IT')}</span>${c.peso?`<span>⚖️ ${c.peso}kg</span>`:''}${c.vita?`<span>Vita ${c.vita}cm</span>`:''}${c.fianchi?`<span>Fianchi ${c.fianchi}cm</span>`:''}${c.spalle?`<span>Spalle ${c.spalle}cm</span>`:''}${c.glutei?`<span>Glutei ${c.glutei}cm</span>`:''}${c.coscia_sx?`<span>Coscia ${c.coscia_sx}cm</span>`:''}</div>`;});}
+    // Check-in accordion
+    html+=`<div style="margin-bottom:18px"><div style="font-size:11px;text-transform:uppercase;letter-spacing:0.06em;color:var(--text3);font-weight:600;margin-bottom:8px">📊 CHECK-IN MISURE</div>`;
+    if(ci?.length){
+      const uid2=`ci_${clientId.slice(0,8)}`;
+      html+=ci.map((c,idx)=>{
+        const acId=`${uid2}_${idx}`;
+        const dateStr=new Date(c.data_checkin).toLocaleDateString('it-IT',{day:'numeric',month:'short',year:'numeric'});
+        const misure=[['⚖️',c.peso,'kg'],['Spalle',c.spalle,'cm'],['Vita',c.vita,'cm'],['Fianchi',c.fianchi,'cm'],['Glutei',c.glutei,'cm'],['Coscia',c.coscia_sx,'cm']].filter(x=>x[1]);
+        return `<div style="border:1.5px solid var(--border);border-radius:var(--r);margin-bottom:5px;overflow:hidden">
+          <button onclick="(function(el,body){body.style.display=body.style.display==='none'?'flex':'none';el.querySelector('.acc-arrow').textContent=body.style.display==='none'?'▶':'▼'})(this,document.getElementById('${acId}'))" style="width:100%;background:var(--warm);border:none;padding:9px 12px;display:flex;align-items:center;gap:8px;cursor:pointer">
+            <span style="font-size:13px;font-weight:600;flex:1;text-align:left">${dateStr}</span>
+            ${idx===0?'<span style="font-size:10px;background:var(--rose-pale);color:var(--rose);padding:2px 7px;border-radius:8px">Più recente</span>':''}
+            ${c.peso?`<span style="font-size:12px;color:var(--text2)">⚖️ ${c.peso}kg</span>`:''}
+            <span class="acc-arrow" style="font-size:10px;color:var(--text3)">▶</span>
+          </button>
+          <div id="${acId}" style="display:none;flex-wrap:wrap;gap:10px;padding:10px 12px;background:#fff">
+            ${misure.map(x=>`<div style="font-size:12px;background:var(--warm);border-radius:var(--r);padding:5px 10px">${x[0]} <strong>${x[1]}${x[2]}</strong></div>`).join('')}
+          </div>
+        </div>`;
+      }).join('');
+    }
     else html+=`<div style="font-size:13px;color:var(--text3);font-style:italic">Nessun check-in</div>`;
     html+='</div>';
     // Piano alimentare (already loaded in Promise.all above)
