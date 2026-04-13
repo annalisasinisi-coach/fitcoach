@@ -431,13 +431,13 @@ input,textarea,select{font-family:'DM Sans',sans-serif}
     <button class="btn-login" id="btn-accedi">Accedi →</button>
     <div style="display:flex;justify-content:space-between;align-items:center;margin-top:-4px">
       <button id="btn-forgot" style="background:transparent;border:none;color:var(--text3);font-size:12px;cursor:pointer;text-decoration:underline">Password dimenticata?</button>
-      <button id="btn-show-register" style="background:transparent;border:none;color:var(--violet);font-size:12px;cursor:pointer;text-decoration:underline;font-weight:500">Registrati</button>
+
     </div>
   </div>
 </div>
 
 <!-- REGISTRAZIONE -->
-<div id="register-screen" style="display:none;position:fixed;inset:0;background:linear-gradient(145deg,#FFF5F0 0%,#FDE8EF 40%,#F0E6F8 100%);align-items:center;justify-content:center;z-index:1000;transition:opacity 0.4s ease">
+<div id="register-screen" style="display:none!important;position:fixed;inset:0;background:linear-gradient(145deg,#FFF5F0 0%,#FDE8EF 40%,#F0E6F8 100%);align-items:center;justify-content:center;z-index:1000;transition:opacity 0.4s ease">
   <div class="ld a"></div><div class="ld b"></div>
   <div class="login-box" style="width:min(440px,calc(100vw - 32px));max-height:90vh;overflow-y:auto">
     <div class="login-logo-wrap">
@@ -693,7 +693,7 @@ input,textarea,select{font-family:'DM Sans',sans-serif}
           <div class="stat-card"><div class="stat-icon">💬</div><div class="stat-label">Clienti registrate</div><div class="stat-value" id="adm-msgs">0</div></div>
           <div class="stat-card"><div class="stat-icon">📋</div><div class="stat-label">Schede create</div><div class="stat-value" id="adm-schede-n">0</div></div>
         </div>
-        <div class="card"><div class="card-title">Le tue clienti</div>
+        <div class="card"><div class="card-title" style="display:flex;justify-content:space-between;align-items:center">Le tue clienti <button class="btn-primary" style="font-size:12px;padding:7px 14px" onclick="openInviteModal()">✉️ Invita cliente</button></div>
           <table class="tbl"><thead><tr><th>Nome</th><th>Stato</th><th>Ultimo all.</th><th>Check-in</th><th>Aderenza</th><th>Azioni</th></tr></thead>
           <tbody id="admin-tbody"></tbody></table>
         </div>
@@ -708,7 +708,7 @@ input,textarea,select{font-family:'DM Sans',sans-serif}
               <div class="grid-2">
                 <div class="field"><label>Nome scheda</label><input type="text" id="s-nome" placeholder="es. Fase 2 — Ipertrofia"></div>
                 <div class="field"><label>Assegna a</label><select id="s-cliente"><option value="">— Template (non assegnata) —</option></select></div>
-                <div class="field"><label>Durata</label><select id="s-weeks"><option value="4">4 settimane</option><option value="6">6 settimane</option><option value="8">8 settimane</option><option value="12">12 settimane</option></select></div>
+                <div class="field"><label>Durata</label><select id="s-weeks"><option value="1">1 settimana</option><option value="2">2 settimane</option><option value="3">3 settimane</option><option value="4">4 settimane</option><option value="6">6 settimane</option><option value="8">8 settimane</option><option value="12">12 settimane</option></select></div>
                 <div class="field"><label>Data inizio</label><input type="date" id="s-start"></div>
               </div>
               <div class="field"><label>Note globali coach</label><textarea id="s-note-globali" placeholder="Indicazioni valide per tutte le sessioni..."></textarea></div>
@@ -897,6 +897,22 @@ input,textarea,select{font-family:'DM Sans',sans-serif}
       </div>
 
     </main>
+  </div>
+</div>
+
+<!-- MODAL INVITA CLIENTE -->
+<div class="modal-overlay" id="invite-modal">
+  <div class="modal-box">
+    <div class="modal-title">✉️ Invita cliente <button class="modal-close" onclick="closeInviteModal()">×</button></div>
+    <p style="font-size:13px;color:var(--text2);margin-bottom:16px;line-height:1.6">Inserisci l'email della cliente. Supabase invierà automaticamente un'email con il link per impostare la password e accedere all'app.</p>
+    <div class="field"><label>Email cliente</label><input type="email" id="invite-email" placeholder="giulia@email.com"></div>
+    <div class="field"><label>Nome (opzionale)</label><input type="text" id="invite-nome" placeholder="Giulia"></div>
+    <div class="field"><label>Cognome (opzionale)</label><input type="text" id="invite-cognome" placeholder="Marchetti"></div>
+    <div id="invite-result" style="font-size:13px;margin-bottom:12px;display:none"></div>
+    <div style="display:flex;gap:8px;margin-top:4px">
+      <button class="btn-ghost" style="flex:1" onclick="closeInviteModal()">Annulla</button>
+      <button class="btn-primary" style="flex:2" id="invite-btn" onclick="sendInvite()">✉️ Invia invito</button>
+    </div>
   </div>
 </div>
 
@@ -1522,7 +1538,7 @@ async function renderDayContent(idx){
     const libEx=exerciseLibrary.find(e=>e.name===ex.name);
     const stored=weightHist[ex.name];const lastKg=stored?stored.at(-1).kg:'';
     const key=`ex_${idx}_${i}`;const done=ls(key,false);const fb=ls(`fb_${key}`,{emoji:'',text:''});
-    const videoHTML=libEx?.video?`<iframe class="ex-video-embed" src="${libEx.video}" title="${ex.name}" frameborder="0" allowfullscreen loading="lazy"></iframe>`:`<div class="ex-video-ph"><div class="pi">▶</div><span style="font-size:10px;color:var(--text3)">Nessun video</span></div>`;
+    const videoSrc=libEx?.video||ex.video||'';    const videoHTML=videoSrc?`<iframe class="ex-video-embed" src="${videoSrc}" title="${ex.name}" frameborder="0" allowfullscreen loading="lazy"></iframe>`:`<div class="ex-video-ph"><div class="pi">▶</div><span style="font-size:10px;color:var(--text3)">Nessun video</span></div>`;
     return `<div class="ex-card ${done?'completed':''}" id="card_${key}">
       <div class="ex-top">
         <div class="ex-video-col">${videoHTML}</div>
@@ -2628,7 +2644,37 @@ async function delRisorsa(id){
 }
 
 
+// ── INVITA CLIENTE ──
+function openInviteModal(){document.getElementById('invite-modal').classList.add('open');document.getElementById('invite-result').style.display='none';document.getElementById('invite-email').value='';document.getElementById('invite-nome').value='';document.getElementById('invite-cognome').value='';}
+function closeInviteModal(){document.getElementById('invite-modal').classList.remove('open');}
+async function sendInvite(){
+  const email=document.getElementById('invite-email').value.trim();
+  const nome=document.getElementById('invite-nome').value.trim();
+  const cognome=document.getElementById('invite-cognome').value.trim();
+  const res=document.getElementById('invite-result');
+  const btn=document.getElementById('invite-btn');
+  if(!email){res.style.color='var(--rose)';res.textContent='❌ Inserisci l\'email';res.style.display='block';return;}
+  btn.textContent='Invio...';btn.disabled=true;
+  res.style.display='none';
+  try{
+    const tempPwd=Math.random().toString(36).slice(2,10)+'A1!';
+    const {data,error}=await supa.auth.signUp({email,password:tempPwd,options:{data:{nome,cognome},emailRedirectTo:'https://annalisa-sinisi-fitcoach.netlify.app'}});
+    if(error){res.style.color='var(--rose)';res.textContent='❌ '+error.message;res.style.display='block';btn.textContent='✉️ Invia invito';btn.disabled=false;return;}
+    if(data.user){
+      await new Promise(r=>setTimeout(r,1500));
+      await supa.from('profiles').upsert({id:data.user.id,email,nome:nome||null,cognome:cognome||null,role:'cliente'},{onConflict:'id'});
+      await supa.auth.resetPasswordForEmail(email,{redirectTo:'https://annalisa-sinisi-fitcoach.netlify.app'});
+    }
+    res.style.color='var(--sage)';
+    res.textContent=`✅ Invito inviato a ${email}! Riceverà un'email per impostare la password.`;
+    res.style.display='block';
+    btn.textContent='✉️ Invia invito';btn.disabled=false;
+    setTimeout(()=>{closeInviteModal();loadUserData().then(()=>renderAdminDash());},2500);
+  }catch(e){res.style.color='var(--rose)';res.textContent='❌ Errore: '+e.message;res.style.display='block';btn.textContent='✉️ Invia invito';btn.disabled=false;}
+}
+
 async function now(){const d=new Date();return `${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}`;}
+
 let toastTm;
 async function toast(msg){clearTimeout(toastTm);document.getElementById('toast-txt').textContent=msg;document.getElementById('toast-el').classList.add('show');toastTm=setTimeout(()=>document.getElementById('toast-el').classList.remove('show'),2800);}
 
@@ -2720,7 +2766,35 @@ async function viewClient(clientId, clientName){
       </div></div>`;
     // Scheda
     html+=`<div style="margin-bottom:18px"><div style="font-size:11px;text-transform:uppercase;letter-spacing:0.06em;color:var(--text3);font-weight:600;margin-bottom:8px">📋 SCHEDA</div>`;
-    if(scheda?.length){const s=scheda[0];html+=`<div style="background:var(--warm);border-radius:var(--r);padding:10px 14px"><div style="font-weight:600">${s.nome}</div><div style="font-size:12px;color:var(--text2)">Sett. ${s.current_week||1}/${s.weeks||4} · ${s.giorni?.length||0} giorni</div></div>`;}
+    if(scheda?.length){
+      const s=scheda[0];
+      const giorniHtml=(s.giorni||[]).map((g,gi)=>{
+        const exHtml=(g.esercizi||[]).map((ex,ei)=>`
+          <div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border)">
+            <div style="width:22px;height:22px;border-radius:50%;background:var(--rose-pale);color:var(--rose);font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">${ei+1}</div>
+            <div style="flex:1;min-width:0">
+              <div style="font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${ex.name}</div>
+              <div style="font-size:11px;color:var(--text2)">${ex.sets} × ${ex.reps} · Rec: ${ex.recupero||'—'} · RPE ${ex.rpe||'—'}</div>
+              ${ex.note?`<div style="font-size:10px;color:var(--text3);font-style:italic">${ex.note}</div>`:''}
+            </div>
+          </div>`).join('');
+        return `<div style="background:var(--warm);border-radius:var(--r);padding:10px 12px;margin-bottom:6px">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:${g.tipo==='riposo'?'0':'8px'}">
+            <span style="font-size:11px;font-weight:700;background:${g.tipo==='riposo'?'var(--peach-pale)':'var(--rose-pale)'};color:${g.tipo==='riposo'?'#C07040':'var(--rose)'};padding:2px 8px;border-radius:10px">${g.label}</span>
+            <span style="font-size:12px;font-weight:600">${g.nome||''}</span>
+            ${g.tipo==='riposo'?'<span style="font-size:11px;color:var(--text3)">😴 Riposo</span>':''}
+          </div>
+          ${g.tipo!=='riposo'?exHtml:''}
+          ${g.note&&g.tipo!=='riposo'?`<div style="font-size:11px;color:var(--text2);margin-top:6px;padding-top:6px;border-top:1px solid var(--border)">📝 ${g.note}</div>`:''}
+        </div>`;
+      }).join('');
+      html+=`<div style="background:linear-gradient(135deg,var(--violet-pale),var(--rose-pale));border-radius:var(--r);padding:10px 14px;margin-bottom:8px">
+        <div style="font-weight:600;margin-bottom:2px">${s.nome}</div>
+        <div style="font-size:12px;color:var(--text2);margin-bottom:10px">Sett. ${s.current_week||1}/${s.weeks||4} · ${s.giorni?.length||0} giorni · ${(s.giorni||[]).reduce((tot,g)=>tot+(g.esercizi||[]).length,0)} esercizi totali</div>
+        ${giorniHtml}
+        ${s.note_globali?`<div style="font-size:11px;color:var(--text2);margin-top:8px;padding-top:8px;border-top:1px solid rgba(0,0,0,0.08)">📋 Note: ${s.note_globali}</div>`:''}
+      </div>`;
+    }
     else html+=`<div style="font-size:13px;color:var(--text3);font-style:italic">Nessuna scheda assegnata</div>`;
     html+='</div>';
     // Check-in
@@ -2862,7 +2936,8 @@ document.addEventListener('click', function(e){
   const btn = e.target.closest('.view-client-btn');
   if(btn){ viewClient(btn.dataset.id, btn.dataset.name); }
 });
-document.getElementById('btn-show-register').addEventListener('click', showRegister);
+// Registration disabled — clients are invited by coach
+// document.getElementById('btn-show-register')?.addEventListener('click', showRegister);
 document.getElementById('btn-forgot').addEventListener('click', doForgotPassword);
 document.getElementById('reg-btn').addEventListener('click', doRegister);
 document.getElementById('btn-show-login').addEventListener('click', showLogin);
