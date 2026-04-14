@@ -719,6 +719,7 @@ input,textarea,select{font-family:'DM Sans',sans-serif}
               <button class="btn-add-day" onclick="addDay()">+ Aggiungi giorno</button>
               <div style="display:flex;gap:8px;margin-top:14px">
                 <button class="btn-ghost" style="flex:1" onclick="saveSchedaTemplate()">📁 Salva come template</button>
+                <button class="btn-sm" id="btn-annulla-modifica" style="display:none" onclick="resetSchedaBuilder()">✕ Annulla</button>
                 <button class="btn-primary" style="flex:2" onclick="saveScheda()">💾 Salva e assegna</button>
               </div>
             </div>
@@ -1955,6 +1956,72 @@ async function addExBuilder(btn){
   c.appendChild(div);updateDatalist();
 }
 async function updateDatalist(){let dl=document.getElementById('ex-datalist');if(!dl){dl=document.createElement('datalist');dl.id='ex-datalist';document.body.appendChild(dl);}dl.innerHTML=exerciseLibrary.map(e=>`<option value="${e.name}">`).join('');}
+let editingSchedaId=null; // null = new scheda, id = editing existing
+
+async function editScheda(id){
+  const {data,error}=await supa.from('schede').select('*').eq('id',id).maybeSingle();
+  if(error||!data){toast('❌ Errore caricamento scheda');return;}
+  editingSchedaId=id;
+  // Load data into builder
+  document.getElementById('s-nome').value=data.nome||'';
+  document.getElementById('s-weeks').value=String(data.weeks||4);
+  document.getElementById('s-note-globali').value=data.note_globali||'';
+  // Set client select
+  const sel=document.getElementById('s-cliente');
+  if(data.cliente_id){for(const opt of sel.options){if(opt.value===data.cliente_id){sel.value=data.cliente_id;break;}}}
+  // Set start date
+  const si=document.getElementById('s-start');if(si&&data.start_date)si.value=data.start_date;
+  // Rebuild days
+  document.getElementById('days-container').innerHTML='';dayCount=0;
+  for(const g of (data.giorni||[])){
+    await addDay();
+    const dayEl=document.getElementById('days-container').lastElementChild;
+    if(dayEl){
+      const lbl=dayEl.querySelector('.db-label');if(lbl)lbl.value=g.label||'';
+      const nom=dayEl.querySelector('.db-nome');if(nom)nom.value=g.nome||'';
+      const tip=dayEl.querySelector('.db-tipo');if(tip)tip.value=g.tipo||'allenamento';
+      const not=dayEl.querySelector('.db-note');if(not)not.value=g.note||'';
+      const addBtn=dayEl.querySelector('.btn-add-ex');
+      for(const ex of (g.esercizi||[])){
+        addExBuilder(addBtn);
+        const exEls=dayEl.querySelectorAll('.ex-builder');
+        const exEl=exEls[exEls.length-1];
+        if(exEl){
+          exEl.querySelector('.eb-name').value=ex.name||'';
+          exEl.querySelector('.eb-sets').value=ex.sets||3;
+          exEl.querySelector('.eb-reps').value=ex.reps||'10';
+          exEl.querySelector('.eb-rec').value=ex.recupero||'90s';
+          exEl.querySelector('.eb-rpe').value=ex.rpe||7;
+          exEl.querySelector('.eb-rir').value=ex.rir||3;
+          exEl.querySelector('.eb-note').value=ex.note||'';
+        }
+      }
+    }
+  }
+  // Update UI to show editing state
+  const saveBtn=document.querySelector('[onclick="saveScheda()"]');
+  if(saveBtn){saveBtn.textContent='💾 Aggiorna scheda';}
+  const annullaBtn=document.getElementById('btn-annulla-modifica');
+  if(annullaBtn)annullaBtn.style.display='block';
+  const title=document.querySelector('.meso-config-title');
+  if(title)title.textContent='✏️ Modifica mesociclo';
+  window.scrollTo({top:0,behavior:'smooth'});
+  toast(`✏️ Modifica scheda "${data.nome}" — clicca "Aggiorna scheda" quando hai finito`);
+}
+
+function resetSchedaBuilder(){
+  editingSchedaId=null;
+  document.getElementById('s-nome').value='';
+  document.getElementById('days-container').innerHTML='';
+  dayCount=0;addDay();
+  const saveBtn=document.querySelector('[onclick="saveScheda()"]');
+  if(saveBtn){saveBtn.textContent='💾 Salva e assegna';}
+  const annullaBtn=document.getElementById('btn-annulla-modifica');
+  if(annullaBtn)annullaBtn.style.display='none';
+  const title=document.querySelector('.meso-config-title');
+  if(title)title.textContent='🗓 Configurazione mesociclo';
+}
+
 async function saveScheda(){
   const nome=document.getElementById('s-nome').value.trim();if(!nome){toast('❌ Inserisci un nome');return;}
   const clienteSelect=document.getElementById('s-cliente');
@@ -1965,9 +2032,19 @@ async function saveScheda(){
   const noteGlobali=document.getElementById('s-note-globali').value;
   const giorni=collectGiorni();
   if(user?.id){
-    await dbInsert('schede',{nome,cliente_id:clienteId,coach_id:user.id,weeks,start_date:start||null,note_globali:noteGlobali,giorni,attiva:true});
+    if(editingSchedaId){
+      // UPDATE existing scheda
+      const {error}=await supa.from('schede').update({nome,cliente_id:clienteId,weeks,start_date:start||null,note_globali:noteGlobali,giorni}).eq('id',editingSchedaId);
+      if(error){toast('❌ Errore aggiornamento: '+error.message);return;}
+      toast(`✅ Scheda "${nome}" aggiornata!`);
+    } else {
+      // INSERT new scheda
+      await dbInsert('schede',{nome,cliente_id:clienteId,coach_id:user.id,weeks,start_date:start||null,note_globali:noteGlobali,giorni,attiva:true});
+      toast(`✅ Scheda assegnata a ${clienteName}!`);
+    }
   }
-  document.getElementById('s-nome').value='';document.getElementById('days-container').innerHTML='';dayCount=0;renderSchedeList();addDay();toast(`✅ Scheda assegnata a ${clienteName}!`);
+  resetSchedaBuilder();
+  renderSchedeList();
 }
 async function renderSchedeList(){
   // Reload from DB — only show active schede
@@ -1980,7 +2057,7 @@ async function renderSchedeList(){
   document.getElementById('schede-list').innerHTML=schedeList.length?schedeList.map((s,i)=>{
     const cl=clientiList.find(c=>c.id===s.clienteId);
     const clienteName=cl?.name||s.clienteId||'—';
-    return `<div style="background:var(--warm);border:1.5px solid var(--border);border-radius:var(--r2);padding:12px 14px;margin-bottom:8px"><div style="font-size:13px;font-weight:600;margin-bottom:2px">${s.nome}</div><div style="font-size:11px;color:var(--text2);margin-bottom:8px">👤 ${clienteName} · ${s.weeks||4} settimane · ${s.start||s.data||'—'}</div><div style="display:flex;gap:6px"><span class="badge badge-green">Attiva</span><button class="btn-danger" style="margin-left:auto" onclick="delScheda('${s.id}',${i})">Elimina</button></div></div>`;
+    return `<div style="background:var(--warm);border:1.5px solid var(--border);border-radius:var(--r2);padding:12px 14px;margin-bottom:8px"><div style="font-size:13px;font-weight:600;margin-bottom:2px">${s.nome}</div><div style="font-size:11px;color:var(--text2);margin-bottom:8px">👤 ${clienteName} · ${s.weeks||4} settimane · ${s.start||s.data||'—'}</div><div style="display:flex;gap:6px"><span class="badge badge-green">Attiva</span><button class="btn-ghost" style="margin-left:auto" onclick="editScheda('${s.id}')">✏️ Modifica</button><button class="btn-danger" onclick="delScheda('${s.id}',${i})">Elimina</button></div></div>`;
   }).join(''):'<div style="font-size:13px;color:var(--text3);font-style:italic;padding:10px 0">Nessuna scheda attiva.</div>';
 }
 async function delScheda(id,i){
