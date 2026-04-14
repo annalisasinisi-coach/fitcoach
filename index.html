@@ -3,6 +3,19 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<!-- v2.5.0 -->
+<script>
+// Force hard reload if an old cached version is detected
+(function(){
+  const V='2.5.0';
+  const stored=localStorage.getItem('_app_version');
+  if(stored&&stored!==V){localStorage.setItem('_app_version',V);location.reload(true);}
+  else if(!stored){localStorage.setItem('_app_version',V);}
+})();
+</script>
 <title>Annalisa Sinisi Fit Coach v2025-04-02</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=Playfair+Display:ital,wght@0,600;0,700;1,500&display=swap" rel="stylesheet">
 
@@ -638,6 +651,10 @@ input,textarea,select{font-family:'DM Sans',sans-serif}
       <!-- PROFILO -->
       <div class="page" id="page-profilo">
         <div class="page-title">Il mio profilo</div>
+        <div id="password-banner" style="display:none;background:linear-gradient(135deg,var(--violet-pale),var(--rose-pale));border:2px solid var(--rose);border-radius:var(--r2);padding:14px 18px;margin-bottom:16px;font-size:13px;color:var(--text)">
+          🔐 <strong>Benvenuta!</strong> Imposta la tua password nella sezione qui sotto per accedere normalmente in futuro.
+          <button onclick="sessionStorage.removeItem('_set_pwd');document.getElementById('password-banner').style.display='none'" style="float:right;background:transparent;border:none;font-size:16px;cursor:pointer;color:var(--text2)">×</button>
+        </div>
         <div class="page-sub">Dati personali e avatar</div>
         <div class="grid-2">
           <div class="card">
@@ -1080,7 +1097,7 @@ const CHECK_QUESTIONS=[
   {id:'dubbi',type:'textarea',q:'Hai dubbi o difficoltà che ti impediscono di dare il massimo durante gli allenamenti?'},
 ];
 
-let currentMeso=ls('meso',{nome:'',weeks:4,currentWeek:1,startDate:'',noteGlobali:'',giorni:[]});
+let currentMeso={nome:'',weeks:4,currentWeek:1,startDate:'',noteGlobali:'',giorni:[]}; // always loaded fresh from DB
 let weightHist=ls('weights',{});
 let checkins=ls('checkins',[]);
 let chatMsgs=ls('chat',[]);
@@ -1422,6 +1439,13 @@ async function navigate(pg){
   if(pg==='risorse')renderRisorse();
   if(pg==='admin-risorse')renderAdminRisorse();
   if(pg==='admin-promemoria')renderReminders();
+  // Show password banner for new clients arriving from invite link
+  if(pg==='profilo'){
+    const banner=document.getElementById('password-banner');
+    if(banner&&sessionStorage.getItem('_set_pwd')==='1'){
+      banner.style.display='block';
+    }
+  }
   if(pg==='admin-checkins')renderAdminCi();
   if(pg==='admin-chat')renderAdminChat();
   if(pg==='admin-questionari')renderAdminQuestionari();
@@ -2756,7 +2780,7 @@ async function sendInvite(){
 async function now(){const d=new Date();return `${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}`;}
 
 let toastTm;
-async function toast(msg){clearTimeout(toastTm);document.getElementById('toast-txt').textContent=msg;document.getElementById('toast-el').classList.add('show');toastTm=setTimeout(()=>document.getElementById('toast-el').classList.remove('show'),2800);}
+async function toast(msg,dur=2800){clearTimeout(toastTm);document.getElementById('toast-txt').textContent=msg;document.getElementById('toast-el').classList.add('show');toastTm=setTimeout(()=>document.getElementById('toast-el').classList.remove('show'),dur);}
 
 // ── REGISTER ──
 async function showRegister(){
@@ -3051,7 +3075,38 @@ document.getElementById('login-pwd').addEventListener('keydown',e=>{if(e.key==='
 document.getElementById('reg-pwd2').addEventListener('keydown',e=>{if(e.key==='Enter')doRegister();});
 updateDatalist();
 
-async function initApp(){ await checkSession(); }
+async function initApp(){
+  // CRITICAL: wipe ALL stale localStorage so a new client on a shared device
+  // never sees another user's cached scheda or data
+  const knownKeys=['meso','weights','checkins','chat','profilo','library',
+    'reminders','admin_chat','schede','macros','admin_meals','feedbacks',
+    'anamnesi','checkAnswers','asfc4_library'];
+  knownKeys.forEach(k=>{localStorage.removeItem('asfc3_'+k);localStorage.removeItem('asfc4_'+k);});
+
+  // Detect Supabase password-recovery hash (implicit flow)
+  // Supabase appends #access_token=...&type=recovery when user clicks reset link
+  const hash = window.location.hash;
+  if(hash.includes('type=recovery') || hash.includes('type=invite')){
+    // Let Supabase JS SDK pick up the session from the hash
+    const {data,error} = await supa.auth.getSession();
+    if(data?.session){
+      sessionStorage.setItem('_set_pwd','1'); // flag to show password banner
+      await afterLogin(data.session.user);
+      // Scroll to profile and highlight password section
+      setTimeout(()=>{
+        navigate('profilo');
+        toast('🔐 Benvenuta! Imposta la tua password nella sezione qui sotto.', 5000);
+        const pwd1=document.getElementById('p-pwd1');
+        if(pwd1){pwd1.focus();pwd1.scrollIntoView({behavior:'smooth',block:'center'});}
+      }, 800);
+      history.replaceState(null,'',window.location.pathname);
+      return;
+    }
+  }
+
+  // Normal session restore
+  await checkSession();
+}
 initApp();
 
 // Listen for Supabase real-time chat messages
