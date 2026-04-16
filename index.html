@@ -318,14 +318,15 @@ input,textarea,select{font-family:'DM Sans',sans-serif}
 .ex-pill{padding:5px 14px;border-radius:20px;border:1px solid var(--border);background:transparent;color:var(--text2);font-size:12px;transition:var(--tr);cursor:pointer}
 .ex-pill.active{background:var(--rose-pale);border-color:rgba(232,82,122,0.25);color:var(--rose)}
 @media(max-width:720px){
-  .sidebar{position:fixed;left:0;top:60px;bottom:0;transform:translateX(-100%);display:flex}
+  .sidebar{position:fixed;left:0;top:60px;bottom:0;transform:translateX(-100%);width:220px;box-shadow:4px 0 20px rgba(0,0,0,0.15)}
   .sidebar.open{transform:translateX(0)}
   .sidebar-overlay.open{display:block}
   .hamburger{display:block}
+  .app-layout{display:block}
+  .main{padding:14px;width:100%;box-sizing:border-box;max-width:100vw;overflow-x:hidden}
   .grid-2,.grid-3,.grid-4{grid-template-columns:1fr}
   .ex-top{flex-direction:column}
   .ex-video-col{width:100%}
-  .main{padding:14px}
 }
 </style>
 </head>
@@ -1783,6 +1784,37 @@ async function saveScheda(){
   }
   document.getElementById('s-nome').value='';document.getElementById('days-container').innerHTML='';dayCount=0;renderSchedeList();addDay();toast(`✅ Scheda assegnata a ${clienteName}!`);
 }
+// ── INVITE CLIENTE ──
+function openInviteModal(){
+  const modal=document.getElementById('invite-modal');if(!modal)return;
+  document.getElementById('invite-email').value='';
+  document.getElementById('invite-nome').value='';
+  document.getElementById('invite-cognome').value='';
+  const msg=document.getElementById('invite-msg');if(msg)msg.style.display='none';
+  modal.style.display='flex';
+}
+async function sendInvite(){
+  const email=document.getElementById('invite-email').value.trim();
+  const nome=document.getElementById('invite-nome').value.trim();
+  const cognome=document.getElementById('invite-cognome').value.trim();
+  const msg=document.getElementById('invite-msg');
+  const btn=document.getElementById('btn-invite-send');
+  if(!email){if(msg){msg.style.cssText='background:var(--rose-pale);color:var(--rose);display:block';msg.textContent='Inserisci email';}return;}
+  if(btn){btn.textContent='Invio...';btn.disabled=true;}
+  const tmp=Math.random().toString(36).slice(-8)+'Aa1!';
+  const {data,error}=await supa.auth.signUp({email,password:tmp,options:{data:{nome,cognome},emailRedirectTo:'https://annalisa-sinisi-fitcoach.netlify.app'}});
+  if(btn){btn.textContent='Invia invito 📧';btn.disabled=false;}
+  if(error){if(msg){msg.style.cssText='background:var(--rose-pale);color:var(--rose);display:block';msg.textContent='Errore: '+error.message;}return;}
+  if(data.user){
+    await new Promise(r=>setTimeout(r,1000));
+    await supa.from('profiles').upsert({id:data.user.id,email,nome:nome||null,cognome:cognome||null,role:'cliente'},{onConflict:'id'});
+    await supa.auth.resetPasswordForEmail(email,{redirectTo:'https://annalisa-sinisi-fitcoach.netlify.app'});
+  }
+  if(msg){msg.style.cssText='background:#e8f5e9;color:#2e7d32;display:block';msg.textContent='Invito inviato a '+email+'!';}
+  await loadUserData();renderAdminDash();
+  setTimeout(()=>{const m=document.getElementById('invite-modal');if(m)m.style.display='none';},3000);
+}
+
 async function renderSchedeList(){document.getElementById('schede-list').innerHTML=schedeList.map((s,i)=>`<div style="background:var(--warm);border:1.5px solid var(--border);border-radius:var(--r2);padding:12px 14px;margin-bottom:8px"><div style="font-size:13px;font-weight:600;margin-bottom:2px">${s.nome}</div><div style="font-size:11px;color:var(--text2);margin-bottom:8px">👤 ${s.cliente} · ${s.weeks} settimane · ${s.start||s.data}</div><div style="display:flex;gap:6px"><span class="badge badge-green">Attiva</span><button class="btn-danger" style="margin-left:auto" onclick="delScheda(${i})">Elimina</button></div></div>`).join('');}
 async function delScheda(i){schedeList.splice(i,1);ss('schede',schedeList);renderSchedeList();toast('Scheda eliminata');}
 
