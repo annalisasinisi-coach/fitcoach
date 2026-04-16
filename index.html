@@ -322,8 +322,8 @@ input,textarea,select{font-family:'DM Sans',sans-serif}
   .sidebar.open{transform:translateX(0)}
   .sidebar-overlay.open{display:block}
   .hamburger{display:block}
-  .app-layout{display:block}
-  .main{padding:14px;width:100%;box-sizing:border-box;max-width:100vw;overflow-x:hidden}
+  .app-body{display:block}
+  .content{padding:14px;width:100%;box-sizing:border-box;max-width:100vw;overflow-x:hidden}
   .grid-2,.grid-3,.grid-4{grid-template-columns:1fr}
   .ex-top{flex-direction:column}
   .ex-video-col{width:100%}
@@ -962,7 +962,7 @@ const CHECK_QUESTIONS=[
   {id:'dubbi',type:'textarea',q:'Hai dubbi o difficoltà che ti impediscono di dare il massimo durante gli allenamenti?'},
 ];
 
-let currentMeso=ls('meso',{nome:'',weeks:4,currentWeek:1,startDate:'',noteGlobali:'',giorni:[]});
+let currentMeso={nome:'',weeks:4,currentWeek:1,startDate:'',noteGlobali:'',giorni:[]}; // always start empty, loaded from DB
 let weightHist=ls('weights',{});
 let checkins=ls('checkins',[]);
 let chatMsgs=ls('chat',[]);
@@ -1092,10 +1092,8 @@ async function afterLogin(supaUser) {
   document.getElementById('nav-role').className='topnav-role '+(role==='admin'?'admin':'cliente');
   buildSidebar(role);
   // Clear any stale localStorage data from previous sessions/demos
-  // Clear all stale localStorage data
-  ['meso','weights','checkins','chat','profilo','library','reminders',
-   'admin_chat','schede','macros','admin_meals','feedbacks','anamnesi','checkAnswers'
-  ].forEach(k=>{localStorage.removeItem('asfc3_'+k);localStorage.removeItem('asfc4_'+k);});
+  // Clear ALL localStorage data on every login to ensure fresh DB data
+  Object.keys(localStorage).filter(k=>k.startsWith('asfc')).forEach(k=>localStorage.removeItem(k));
   // Reset in-memory state
   currentMeso={nome:'',weeks:4,currentWeek:1,startDate:'',noteGlobali:'',giorni:[]};
   checkins=[];chatMsgs=[];weightHist={};exerciseLibrary=[];clientiList=[];
