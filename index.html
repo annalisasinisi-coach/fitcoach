@@ -2874,15 +2874,17 @@ async function pollNotifications(){
         const {data:msgs}=await supa.from('messaggi').select('id').eq('destinatario_id',user.id).gt('created_at',since);
         if(msgs?.length)addNotif('chat',msgs.length);
       }
-      // Check for new/updated scheda
+      // Check for new/updated scheda (created or updated by coach)
       if(page!=='allenamento'){
-        const {data:scheda}=await supa.from('schede').select('id').eq('cliente_id',user.id).eq('attiva',true).gt('created_at',since);
-        if(scheda?.length)addNotif('allenamento',1);
+        const {data:scheda}=await supa.from('schede').select('id,updated_at').eq('cliente_id',user.id).eq('attiva',true);
+        const newScheda=scheda?.filter(s=>(s.updated_at||'')>since);
+        if(newScheda?.length)addNotif('allenamento',1);
       }
-      // Check for updated piano alimentare
+      // Check for new/updated piano alimentare
       if(page!=='piano'){
-        const {data:piano}=await supa.from('piani_alimentari').select('id').eq('cliente_id',user.id).gt('updated_at',since);
-        if(piano?.length)addNotif('piano',1);
+        const {data:piano}=await supa.from('piani_alimentari').select('id,updated_at').eq('cliente_id',user.id);
+        const newPiano=piano?.filter(p=>(p.updated_at||'')>since);
+        if(newPiano?.length)addNotif('piano',1);
       }
       // Check for new promemoria
       if(page!=='home'){
@@ -2981,6 +2983,52 @@ async function setupRealtimeChat(){
     .subscribe((status,err)=>{
       if(err)console.warn('Realtime subscribe error:',err);
     });
+
+  // ── Realtime per CLIENTI: scheda, piano, promemoria ──
+  if(role==='cliente'){
+    supa.channel('cliente_updates_'+user.id)
+      .on('postgres_changes',{event:'INSERT',schema:'public',table:'schede',filter:`cliente_id=eq.${user.id}`},()=>{
+        if(page!=='allenamento'){addNotif('allenamento',1);toast('📋 Annalisa ha assegnato una nuova scheda!');}
+        else loadUserData().then(()=>renderWorkout());
+      })
+      .on('postgres_changes',{event:'UPDATE',schema:'public',table:'schede',filter:`cliente_id=eq.${user.id}`},()=>{
+        if(page!=='allenamento'){addNotif('allenamento',1);toast('📋 La tua scheda è stata aggiornata!');}
+        else loadUserData().then(()=>renderWorkout());
+      })
+      .on('postgres_changes',{event:'INSERT',schema:'public',table:'piani_alimentari',filter:`cliente_id=eq.${user.id}`},()=>{
+        if(page!=='piano'){addNotif('piano',1);toast('🥗 Annalisa ha assegnato un piano alimentare!');}
+      })
+      .on('postgres_changes',{event:'UPDATE',schema:'public',table:'piani_alimentari',filter:`cliente_id=eq.${user.id}`},()=>{
+        if(page!=='piano'){addNotif('piano',1);toast('🥗 Il tuo piano alimentare è stato aggiornato!');}
+      })
+      .on('postgres_changes',{event:'INSERT',schema:'public',table:'promemoria',filter:`cliente_id=eq.${user.id}`},()=>{
+        addNotif('home',1);toast('🔔 Nuovo promemoria da Annalisa!');
+      })
+      .subscribe();
+  }
+
+  // ── Realtime per COACH: check-in, anamnesi, feedback ──
+  if(role==='admin'){
+    supa.channel('coach_updates_'+user.id)
+      .on('postgres_changes',{event:'INSERT',schema:'public',table:'checkins'},payload=>{
+        const cn=clientiList.find(c=>c.id===payload.new?.cliente_id)?.name?.split(' ')[0]||'Una cliente';
+        if(page!=='admin-checkins'){addNotif('admin-checkins',1);toast('📊 '+cn+' ha inviato un check-in!');}
+      })
+      .on('postgres_changes',{event:'INSERT',schema:'public',table:'anamnesi'},()=>{
+        if(page!=='admin-questionari'){addNotif('admin-questionari',1);toast('📝 Nuova anamnesi ricevuta!');}
+      })
+      .on('postgres_changes',{event:'UPDATE',schema:'public',table:'anamnesi'},()=>{
+        if(page!=='admin-questionari'){addNotif('admin-questionari',1);toast('📝 Anamnesi aggiornata!');}
+      })
+      .on('postgres_changes',{event:'INSERT',schema:'public',table:'check_questionari'},()=>{
+        if(page!=='admin-questionari'){addNotif('admin-questionari',1);toast('📝 Nuovo questionario check ricevuto!');}
+      })
+      .on('postgres_changes',{event:'INSERT',schema:'public',table:'feedback_esercizi'},payload=>{
+        const cn=clientiList.find(c=>c.id===payload.new?.cliente_id)?.name?.split(' ')[0]||'Una cliente';
+        if(page!=='admin-feedback'){addNotif('admin-feedback',1);toast('💬 '+cn+' ha lasciato un feedback!');}
+      })
+      .subscribe();
+  }
 }
 </script>
 </body>
