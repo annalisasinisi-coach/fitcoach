@@ -1300,6 +1300,11 @@ async function loadUserData(){
         macros={prot:p.prot_g||0,carb:p.carb_g||0,fat:p.fat_g||0,kcal:p.kcal||0};
         if(p.pasti?.length) adminMeals=p.pasti;
       }
+      // Load exercise library (needed for video URLs in workout view)
+      const {data:libDataC}=await supa.from('esercizi').select('*');
+      if(libDataC?.length){
+        exerciseLibrary=libDataC.map(e=>({id:e.id,name:e.nome,cat:e.categoria||'',video:e.video_url||'',desc:e.descrizione||''}));
+      }
       // Load pesi
       const {data:pesiData}=await supa.from('pesi_esercizi').select('*').eq('cliente_id',user.id).order('data_registrazione');
       if(pesiData?.length){
@@ -2987,21 +2992,26 @@ async function setupRealtimeChat(){
   // ── Realtime per CLIENTI: scheda, piano, promemoria ──
   if(role==='cliente'){
     supa.channel('cliente_updates_'+user.id)
-      .on('postgres_changes',{event:'INSERT',schema:'public',table:'schede',filter:`cliente_id=eq.${user.id}`},()=>{
+      .on('postgres_changes',{event:'INSERT',schema:'public',table:'schede'},payload=>{
+        if(payload.new?.cliente_id!==user.id)return;
         if(page!=='allenamento'){addNotif('allenamento',1);toast('📋 Annalisa ha assegnato una nuova scheda!');}
         else loadUserData().then(()=>renderWorkout());
       })
-      .on('postgres_changes',{event:'UPDATE',schema:'public',table:'schede',filter:`cliente_id=eq.${user.id}`},()=>{
+      .on('postgres_changes',{event:'UPDATE',schema:'public',table:'schede'},payload=>{
+        if(payload.new?.cliente_id!==user.id)return;
         if(page!=='allenamento'){addNotif('allenamento',1);toast('📋 La tua scheda è stata aggiornata!');}
         else loadUserData().then(()=>renderWorkout());
       })
-      .on('postgres_changes',{event:'INSERT',schema:'public',table:'piani_alimentari',filter:`cliente_id=eq.${user.id}`},()=>{
+      .on('postgres_changes',{event:'INSERT',schema:'public',table:'piani_alimentari'},payload=>{
+        if(payload.new?.cliente_id!==user.id)return;
         if(page!=='piano'){addNotif('piano',1);toast('🥗 Annalisa ha assegnato un piano alimentare!');}
       })
-      .on('postgres_changes',{event:'UPDATE',schema:'public',table:'piani_alimentari',filter:`cliente_id=eq.${user.id}`},()=>{
+      .on('postgres_changes',{event:'UPDATE',schema:'public',table:'piani_alimentari'},payload=>{
+        if(payload.new?.cliente_id!==user.id)return;
         if(page!=='piano'){addNotif('piano',1);toast('🥗 Il tuo piano alimentare è stato aggiornato!');}
       })
-      .on('postgres_changes',{event:'INSERT',schema:'public',table:'promemoria',filter:`cliente_id=eq.${user.id}`},()=>{
+      .on('postgres_changes',{event:'INSERT',schema:'public',table:'promemoria'},payload=>{
+        if(payload.new?.cliente_id!==user.id)return;
         addNotif('home',1);toast('🔔 Nuovo promemoria da Annalisa!');
       })
       .subscribe();
