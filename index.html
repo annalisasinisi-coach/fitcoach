@@ -1618,18 +1618,28 @@ async function updTimer(){const m=Math.floor(timerSec/60),s=timerSec%60;document
 const CC={responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#7A5A48',font:{family:'DM Sans',size:11}}}},scales:{x:{ticks:{color:'#B8937A',font:{size:10}},grid:{color:'rgba(180,100,80,0.06)'}},y:{ticks:{color:'#B8937A',font:{size:10}},grid:{color:'rgba(180,100,80,0.06)'}}}};
 let wC=null,bwC=null,mC=null,adhC=null,ciC=null,curEx=Object.keys(weightHist)[0];
 async function renderCharts(){
-  // Esercizi della scheda attiva (se disponibile), altrimenti tutti quelli con dati
+  // Esercizi: prima quelli della scheda attiva con dati, poi gli altri con dati storici
   const schedaExNames=currentMeso?.giorni?.flatMap(g=>g.esercizi?.map(e=>e.name)||[])||[];
   const allExWithData=Object.keys(weightHist);
-  // Priorità: esercizi della scheda che hanno dati; poi tutti gli altri con dati
-  const inScheda=allExWithData.filter(n=>schedaExNames.includes(n));
-  const others=allExWithData.filter(n=>!schedaExNames.includes(n));
+  const inScheda=allExWithData.filter(n=>schedaExNames.some(s=>s&&n&&s.toLowerCase()===n.toLowerCase()));
+  const others=allExWithData.filter(n=>!schedaExNames.some(s=>s&&n&&s.toLowerCase()===n.toLowerCase()));
   const exList=[...inScheda,...others];
   if(!curEx||!exList.includes(curEx)) curEx=exList[0]||'';
   const sel=document.getElementById('ex-sel');
-  sel.innerHTML='<option value="">Seleziona esercizio…</option>'+
-    (inScheda.length?'<optgroup label="📋 Nella scheda">'+inScheda.map(n=>`<option value="${n}" ${n===curEx?'selected':''}>${n}</option>`).join('')+'</optgroup>':'')+
-    (others.length?'<optgroup label="📂 Altri">'+others.map(n=>`<option value="${n}" ${n===curEx?'selected':''}>${n}</option>`).join('')+'</optgroup>':'');
+  if(exList.length===0){
+    sel.innerHTML='<option value="">Nessun dato registrato</option>';
+  } else {
+    const makeOpt=n=>`<option value="${n}" ${n===curEx?'selected':''}>${n}</option>`;
+    if(inScheda.length && others.length){
+      // Split in gruppi solo se ci sono entrambi
+      sel.innerHTML='<option value="">— Scegli esercizio —</option>'+
+        '<optgroup label="📋 Scheda attiva">'+inScheda.map(makeOpt).join('')+'</optgroup>'+
+        '<optgroup label="📂 Storico precedente">'+others.map(makeOpt).join('')+'</optgroup>';
+    } else {
+      // Tutti insieme, senza gruppi
+      sel.innerHTML='<option value="">— Scegli esercizio —</option>'+exList.map(makeOpt).join('');
+    }
+  }
   drawWChart();
   const dates=checkins.map(c=>c.date.slice(5));
   if(bwC)bwC.destroy();bwC=new Chart(document.getElementById('bwChart'),{type:'line',data:{labels:dates,datasets:[{label:'Peso (kg)',data:checkins.map(c=>c.peso),borderColor:'#E8527A',backgroundColor:'rgba(232,82,122,0.07)',tension:0.4,pointBackgroundColor:'#E8527A',pointRadius:5,fill:true}]},options:CC});
@@ -2884,6 +2894,7 @@ async function pollNotifications(){
   if(!user?.id)return;
   const since=lastPollTime;
   lastPollTime=new Date().toISOString();
+  if(user?.id) localStorage.setItem('asfc4_lastPoll_'+user.id, lastPollTime);
   try{
     if(role==='cliente'){
       // Check for new messages to me from coach
@@ -2938,9 +2949,10 @@ async function pollNotifications(){
 }
 function startPolling(){
   if(_pollInterval)clearInterval(_pollInterval);
-  // Start from 5 minutes before login to catch recent activity
+  // Ripristina lastPollTime dal localStorage per non rimostrare notifiche già viste
+  const saved=localStorage.getItem('asfc4_lastPoll_'+(user?.id||''));
   const fiveMinAgo=new Date(Date.now()-5*60*1000).toISOString();
-  lastPollTime=fiveMinAgo;
+  lastPollTime=saved&&saved>fiveMinAgo?saved:fiveMinAgo;
   pollNotifications(); // run immediately
   _pollInterval=setInterval(pollNotifications,30000); // then every 30s
 }
@@ -3053,7 +3065,10 @@ async function setupRealtimeChat(){
         const cn=clientiList.find(c=>c.id===payload.new?.cliente_id)?.name?.split(' ')[0]||'Una cliente';
         if(page!=='admin-feedback'){addNotif('admin-feedback',1);toast('💬 '+cn+' ha lasciato un feedback!');}
       })
-      .subscribe();
+      .subscribe((status,err)=>{
+        if(status==='SUBSCRIBED') console.log('✅ Realtime coach attivo');
+        if(err||status==='CHANNEL_ERROR') console.warn('❌ Realtime coach errore:',err||status);
+      });
   }
 }
 </script>
