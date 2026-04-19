@@ -492,7 +492,7 @@ input,textarea,select{font-family:'DM Sans',sans-serif}
           <div style="flex:1">
             <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:0.07em;font-weight:500;margin-bottom:3px">Prossimo allenamento</div>
             <div style="font-size:16px;font-weight:600" id="next-name">Nessun allenamento assegnato</div>
-            <div style="font-size:12px;color:var(--text2)">6 esercizi · ~50 min</div>
+            <div style="font-size:12px;color:var(--text2)" id="next-meta">— esercizi</div>
           </div>
           <button class="btn-start" onclick="navigate('allenamento')">Inizia →</button>
         </div>
@@ -539,7 +539,7 @@ input,textarea,select{font-family:'DM Sans',sans-serif}
       <div class="page" id="page-progressi">
         <div class="page-title">I tuoi progressi</div>
         <div class="page-sub">Evoluzione dei carichi e del corpo nel tempo</div>
-        <div class="card"><div class="card-title">📈 Progressione pesi</div><div style="display:flex;gap:6px;flex-wrap:wrap;margin:10px 0" id="ex-sel"></div><div class="chart-wrap"><canvas id="wChart"></canvas></div></div>
+        <div class="card"><div class="card-title">📈 Progressione pesi</div><div style="margin:10px 0 6px"><select id="ex-sel" onchange="selExDropdown(this.value)" style="width:100%;padding:8px 12px;border:1.5px solid var(--border);border-radius:var(--r2);background:var(--bg2);color:var(--text);font-size:13px;font-family:inherit"><option value="">Seleziona esercizio…</option></select></div><div class="chart-wrap"><canvas id="wChart"></canvas></div></div>
         <div class="grid-2" style="margin-top:14px">
           <div class="card"><div class="card-title">⚖️ Peso corporeo</div><div class="chart-wrap"><canvas id="bwChart"></canvas></div></div>
           <div class="card"><div class="card-title">📏 Misure corporee</div><div class="chart-wrap"><canvas id="mChart"></canvas></div></div>
@@ -1350,11 +1350,11 @@ async function loadUserData(){
         exerciseLibrary = libData.map(e=>({id:e.id,name:e.nome,cat:e.categoria||'',video:e.video_url||'',desc:e.descrizione||''}));
         ss('asfc4_library',exerciseLibrary);
       }
-      // Load schede list
-      const {data:schedeData}=await supa.from('schede').select('*').order('created_at',{ascending:false});
+      // Load schede list — solo attive per il contatore
+      const {data:schedeData}=await supa.from('schede').select('*').eq('attiva',true).order('created_at',{ascending:false});
       if(schedeData?.length){
         schedeList=schedeData.map(s=>({id:s.id,nome:s.nome,clienteId:s.cliente_id,weeks:s.weeks,start:s.start_date,data:s.created_at?.slice(0,10)}));
-      }
+      } else { schedeList=[]; }
       // Load all messages for admin chat — use plain select (no join to avoid FK-name issues)
       const {data:allMsgs}=await supa.from('messaggi').select('*').order('created_at');
       if(allMsgs?.length){
@@ -1618,13 +1618,25 @@ async function updTimer(){const m=Math.floor(timerSec/60),s=timerSec%60;document
 const CC={responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#7A5A48',font:{family:'DM Sans',size:11}}}},scales:{x:{ticks:{color:'#B8937A',font:{size:10}},grid:{color:'rgba(180,100,80,0.06)'}},y:{ticks:{color:'#B8937A',font:{size:10}},grid:{color:'rgba(180,100,80,0.06)'}}}};
 let wC=null,bwC=null,mC=null,adhC=null,ciC=null,curEx=Object.keys(weightHist)[0];
 async function renderCharts(){
-  document.getElementById('ex-sel').innerHTML=Object.keys(weightHist).map(n=>`<button class="ex-pill ${n===curEx?'active':''}" onclick="selEx('${n}',this)">${n}</button>`).join('');
+  // Esercizi della scheda attiva (se disponibile), altrimenti tutti quelli con dati
+  const schedaExNames=currentMeso?.giorni?.flatMap(g=>g.esercizi?.map(e=>e.name)||[])||[];
+  const allExWithData=Object.keys(weightHist);
+  // Priorità: esercizi della scheda che hanno dati; poi tutti gli altri con dati
+  const inScheda=allExWithData.filter(n=>schedaExNames.includes(n));
+  const others=allExWithData.filter(n=>!schedaExNames.includes(n));
+  const exList=[...inScheda,...others];
+  if(!curEx||!exList.includes(curEx)) curEx=exList[0]||'';
+  const sel=document.getElementById('ex-sel');
+  sel.innerHTML='<option value="">Seleziona esercizio…</option>'+
+    (inScheda.length?'<optgroup label="📋 Nella scheda">'+inScheda.map(n=>`<option value="${n}" ${n===curEx?'selected':''}>${n}</option>`).join('')+'</optgroup>':'')+
+    (others.length?'<optgroup label="📂 Altri">'+others.map(n=>`<option value="${n}" ${n===curEx?'selected':''}>${n}</option>`).join('')+'</optgroup>':'');
   drawWChart();
   const dates=checkins.map(c=>c.date.slice(5));
   if(bwC)bwC.destroy();bwC=new Chart(document.getElementById('bwChart'),{type:'line',data:{labels:dates,datasets:[{label:'Peso (kg)',data:checkins.map(c=>c.peso),borderColor:'#E8527A',backgroundColor:'rgba(232,82,122,0.07)',tension:0.4,pointBackgroundColor:'#E8527A',pointRadius:5,fill:true}]},options:CC});
   if(mC)mC.destroy();mC=new Chart(document.getElementById('mChart'),{type:'line',data:{labels:dates,datasets:[{label:'Vita',data:checkins.map(c=>c.vita),borderColor:'#F5A882',tension:0.4,pointRadius:4},{label:'Fianchi',data:checkins.map(c=>c.fianchi),borderColor:'#7B3FA0',tension:0.4,pointRadius:4},{label:'Spalle',data:checkins.map(c=>c.spalle||0),borderColor:'#E8527A',tension:0.4,pointRadius:4}]},options:CC});
 }
-async function selEx(n,btn){curEx=n;document.querySelectorAll('.ex-pill').forEach(b=>b.classList.remove('active'));btn.classList.add('active');drawWChart();}
+async function selExDropdown(n){curEx=n;drawWChart();}
+async function selEx(n,btn){curEx=n;drawWChart();}
 async function drawWChart(){const data=weightHist[curEx]||[];if(wC)wC.destroy();wC=new Chart(document.getElementById('wChart'),{type:'line',data:{labels:data.map(d=>d.date),datasets:[{label:`${curEx} (kg)`,data:data.map(d=>d.kg),borderColor:'#E8527A',backgroundColor:'rgba(232,82,122,0.08)',tension:0.4,pointBackgroundColor:'#E8527A',pointRadius:5,fill:true}]},options:CC});}
 
 // ══════════════════════════════════
@@ -3014,7 +3026,11 @@ async function setupRealtimeChat(){
         if(payload.new?.cliente_id!==user.id)return;
         addNotif('home',1);toast('🔔 Nuovo promemoria da Annalisa!');
       })
-      .subscribe();
+      .subscribe((status,err)=>{
+        if(status==='SUBSCRIBED') console.log('✅ Realtime cliente attivo');
+        if(err||status==='CHANNEL_ERROR') console.warn('❌ Realtime cliente errore:',err||status);
+        if(status==='TIMED_OUT') console.warn('⚠️ Realtime cliente timeout');
+      });
   }
 
   // ── Realtime per COACH: check-in, anamnesi, feedback ──
