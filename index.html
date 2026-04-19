@@ -3047,25 +3047,41 @@ async function setupRealtimeChat(){
 
   // ── Realtime per COACH: check-in, anamnesi, feedback ──
   if(role==='admin'){
+    console.log('🔧 Setup canale Realtime coach...');
     supa.channel('coach_updates_'+user.id)
-      .on('postgres_changes',{event:'INSERT',schema:'public',table:'checkins'},payload=>{
+      .on('postgres_changes',{event:'*',schema:'public',table:'checkins'},payload=>{
+        console.log('📥 COACH evento checkins:',payload.eventType, payload.new);
+        if(payload.eventType!=='INSERT')return;
         const cn=clientiList.find(c=>c.id===payload.new?.cliente_id)?.name?.split(' ')[0]||'Una cliente';
         if(page!=='admin-checkins'){addNotif('admin-checkins',1);toast('📊 '+cn+' ha inviato un check-in!');}
       })
-      .on('postgres_changes',{event:'INSERT',schema:'public',table:'anamnesi'},()=>{
-        if(page!=='admin-questionari'){addNotif('admin-questionari',1);toast('📝 Nuova anamnesi ricevuta!');}
+      .on('postgres_changes',{event:'*',schema:'public',table:'anamnesi'},payload=>{
+        console.log('📥 COACH evento anamnesi:',payload.eventType, payload.new);
+        if(payload.eventType==='INSERT'){
+          if(page!=='admin-questionari'){addNotif('admin-questionari',1);toast('📝 Nuova anamnesi ricevuta!');}
+        } else if(payload.eventType==='UPDATE'){
+          if(page!=='admin-questionari'){addNotif('admin-questionari',1);toast('📝 Anamnesi aggiornata!');}
+        }
       })
-      .on('postgres_changes',{event:'UPDATE',schema:'public',table:'anamnesi'},()=>{
-        if(page!=='admin-questionari'){addNotif('admin-questionari',1);toast('📝 Anamnesi aggiornata!');}
-      })
-      .on('postgres_changes',{event:'INSERT',schema:'public',table:'check_questionari'},()=>{
+      .on('postgres_changes',{event:'*',schema:'public',table:'check_questionari'},payload=>{
+        console.log('📥 COACH evento check_questionari:',payload.eventType, payload.new);
+        if(payload.eventType!=='INSERT')return;
         if(page!=='admin-questionari'){addNotif('admin-questionari',1);toast('📝 Nuovo questionario check ricevuto!');}
       })
-      .on('postgres_changes',{event:'INSERT',schema:'public',table:'feedback_esercizi'},payload=>{
+      .on('postgres_changes',{event:'*',schema:'public',table:'feedback_esercizi'},payload=>{
+        console.log('📥 COACH evento feedback:',payload.eventType, payload.new);
+        if(payload.eventType!=='INSERT')return;
         const cn=clientiList.find(c=>c.id===payload.new?.cliente_id)?.name?.split(' ')[0]||'Una cliente';
         if(page!=='admin-feedback'){addNotif('admin-feedback',1);toast('💬 '+cn+' ha lasciato un feedback!');}
       })
+      .on('postgres_changes',{event:'*',schema:'public',table:'messaggi'},payload=>{
+        console.log('📥 COACH evento messaggi:',payload.eventType, payload.new?.destinatario_id, 'vs', user.id);
+        if(payload.eventType!=='INSERT')return;
+        if(payload.new?.destinatario_id!==user.id)return;
+        if(page!=='admin-chat'){addNotif('admin-chat',1);toast('💬 Nuovo messaggio da una cliente!');}
+      })
       .subscribe((status,err)=>{
+        console.log('🔔 Realtime coach status:', status, err||'');
         if(status==='SUBSCRIBED') console.log('✅ Realtime coach attivo');
         if(err||status==='CHANNEL_ERROR') console.warn('❌ Realtime coach errore:',err||status);
       });
