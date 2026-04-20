@@ -337,6 +337,7 @@ input,textarea,select{font-family:'DM Sans',sans-serif}
   .topnav{padding:0 8px;min-width:0}
   .topnav-name small{display:none}
   .topnav-brand{overflow:hidden;min-width:0}
+  .topnav-name{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:140px;font-size:13px}
   /* ALL grids → single column */
   .grid-2,.grid-3,.grid-4,
   [style*="grid-template-columns"]{grid-template-columns:1fr!important}
@@ -2567,26 +2568,29 @@ async function renderAdminChecks() {
     el.innerHTML = `<div class="card" style="text-align:center;padding:40px"><div style="font-size:40px;margin-bottom:12px">📊</div><div style="font-size:16px;color:var(--text2)">${qSelectedClient} non ha ancora inviato nessun check mensile</div></div>`;
     return;
   }
+  // Dal più recente al meno recente — già ordinato da DB (id DESC)
   el.innerHTML = checks.map((c,ci) => {
     const rows = CHECK_QUESTIONS.filter(q=>c[q.id]).map(q => {
       const val = c[q.id];
       if(!val) return '';
-      return `<div style="padding:8px 0;border-bottom:1px solid var(--border);display:flex;gap:16px;align-items:flex-start">
-        <div style="font-size:12px;color:var(--text2);flex:1;line-height:1.5">${q.q}</div>
-        <div style="font-size:13px;font-weight:500;color:var(--text);flex:1;text-align:right">${val}</div>
+      return `<div style="padding:7px 0;border-bottom:1px solid var(--border);display:flex;gap:12px;align-items:flex-start">
+        <div style="font-size:12px;color:var(--text2);flex:1.5;line-height:1.5">${q.q}</div>
+        <div style="font-size:12px;font-weight:500;color:var(--text);flex:1;text-align:right">${val}</div>
       </div>`;
     }).join('');
-    return `<div class="card" style="margin-bottom:14px">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
-        <div class="card-title">📊 Check — ${c.data}</div>
-        <div style="display:flex;gap:8px;align-items:center">
-          <span class="badge badge-green">Ricevuto</span>
-          <button class="btn-ghost" onclick="printCheck('${qSelectedClient}',${ci})">🖨️ Stampa</button>
+    return `<details style="margin-bottom:8px;border:1.5px solid var(--border);border-radius:var(--r2);overflow:hidden" ${ci===0?'open':''}>
+      <summary style="padding:12px 16px;cursor:pointer;background:var(--warm);display:flex;align-items:center;justify-content:space-between;list-style:none;user-select:none">
+        <div style="display:flex;align-items:center;gap:10px">
+          <span style="font-size:13px;font-weight:600;color:var(--text)">📊 Check — ${c.data}</span>
+          ${ci===0?'<span class="badge badge-green" style="font-size:10px">Più recente</span>':''}
         </div>
-      </div>
-      ${rows}
-
-    </div>`;
+        <div style="display:flex;gap:8px;align-items:center">
+          <button class="btn-ghost" style="font-size:11px;padding:3px 8px" onclick="event.preventDefault();event.stopPropagation();printCheck('${qSelectedClient}',${ci})">🖨️</button>
+          <span style="color:var(--text3);font-size:12px">▼</span>
+        </div>
+      </summary>
+      <div style="padding:12px 16px;background:var(--bg2)">${rows||'<div style="font-size:13px;color:var(--text3)">Nessuna risposta registrata</div>'}</div>
+    </details>`;
   }).join('');
 }
 
@@ -2824,11 +2828,22 @@ async function viewClient(clientId, clientName){
     }
     else html+=`<div style="font-size:13px;color:var(--text3);font-style:italic">Nessuna scheda assegnata</div>`;
     html+='</div>';
-    // Check-in
-    html+=`<div style="margin-bottom:18px"><div style="font-size:11px;text-transform:uppercase;letter-spacing:0.06em;color:var(--text3);font-weight:600;margin-bottom:8px">📊 ULTIMI CHECK-IN</div>`;
-    if(ci?.length){ci.forEach(c=>{html+=`<div style="background:var(--warm);border-radius:var(--r);padding:8px 12px;margin-bottom:5px;font-size:12px;display:flex;gap:12px;flex-wrap:wrap"><span style="font-weight:600">${new Date(c.data_checkin).toLocaleDateString('it-IT')}</span>${c.peso?`<span>⚖️ ${c.peso}kg</span>`:''}${c.vita?`<span>Vita ${c.vita}cm</span>`:''}${c.fianchi?`<span>Fianchi ${c.fianchi}cm</span>`:''}${c.spalle?`<span>Spalle ${c.spalle}cm</span>`:''}${c.glutei?`<span>Glutei ${c.glutei}cm</span>`:''}${c.coscia_sx?`<span>Coscia ${c.coscia_sx}cm</span>`:''}</div>`;});}
-    else html+=`<div style="font-size:13px;color:var(--text3);font-style:italic">Nessun check-in</div>`;
-    html+='</div>';
+    // Check-in — collapsibili per data
+    html+=`<details style="margin-bottom:16px;border:1.5px solid var(--border);border-radius:var(--r2);overflow:hidden" open>
+      <summary style="padding:10px 14px;cursor:pointer;background:var(--warm);font-size:11px;text-transform:uppercase;letter-spacing:0.06em;color:var(--text3);font-weight:600;list-style:none;display:flex;justify-content:space-between;align-items:center">
+        <span>📊 CHECK-IN (${ci?.length||0})</span><span style="font-size:12px">▼</span>
+      </summary>
+      <div style="padding:10px 14px;background:var(--bg2)">`;
+    if(ci?.length){ci.forEach(c=>{html+=`<details style="margin-bottom:6px;border:1px solid var(--border);border-radius:var(--r);overflow:hidden">
+      <summary style="padding:8px 12px;cursor:pointer;background:var(--warm);font-size:12px;font-weight:600;list-style:none;display:flex;justify-content:space-between">
+        <span>${new Date(c.data_checkin).toLocaleDateString('it-IT')}</span>
+        ${c.peso?`<span style="color:var(--rose)">⚖️ ${c.peso}kg</span>`:''}
+      </summary>
+      <div style="padding:8px 12px;font-size:12px;display:flex;gap:10px;flex-wrap:wrap;background:var(--bg2)">
+        ${c.peso?`<span>⚖️ <strong>${c.peso}</strong>kg</span>`:''}${c.vita?`<span>Vita <strong>${c.vita}</strong>cm</span>`:''}${c.fianchi?`<span>Fianchi <strong>${c.fianchi}</strong>cm</span>`:''}${c.spalle?`<span>Spalle <strong>${c.spalle}</strong>cm</span>`:''}${c.glutei?`<span>Glutei <strong>${c.glutei}</strong>cm</span>`:''}${c.coscia_sx?`<span>Coscia <strong>${c.coscia_sx}</strong>cm</span>`:''}
+      </div></details>`;});}
+    else html+=`<div style="font-size:13px;color:var(--text3);font-style:italic;padding:8px 0">Nessun check-in</div>`;
+    html+='</div></details>';
     // Piano alimentare (already loaded in Promise.all above)
     html+=`<div style="margin-bottom:18px"><div style="font-size:11px;text-transform:uppercase;letter-spacing:0.06em;color:var(--text3);font-weight:600;margin-bottom:8px">🥗 PIANO ALIMENTARE</div>`;
     const pianoRow=piano?.[0];
@@ -2844,16 +2859,37 @@ async function viewClient(clientId, clientName){
       </div>`;
     } else html+=`<div style="font-size:13px;color:var(--text3);font-style:italic">Nessun piano alimentare assegnato</div>`;
     html+='</div>';
-    // Pesi
-    html+=`<div style="margin-bottom:18px"><div style="font-size:11px;text-transform:uppercase;letter-spacing:0.06em;color:var(--text3);font-weight:600;margin-bottom:8px">💪 PESI REGISTRATI</div>`;
-    if(pesi?.length){const byEx={};pesi.forEach(p=>{if(!byEx[p.esercizio_nome])byEx[p.esercizio_nome]=p.kg;});html+=Object.entries(byEx).map(([ex,kg])=>`<div style="background:var(--warm);border-radius:var(--r);padding:7px 12px;margin-bottom:4px;display:flex;justify-content:space-between;font-size:13px"><span>${ex}</span><strong>${kg}kg</strong></div>`).join('');}
-    else html+=`<div style="font-size:13px;color:var(--text3);font-style:italic">Nessun peso registrato</div>`;
-    html+='</div>';
-    // Feedback
-    html+=`<div><div style="font-size:11px;text-transform:uppercase;letter-spacing:0.06em;color:var(--text3);font-weight:600;margin-bottom:8px">💬 FEEDBACK ALLENAMENTO</div>`;
-    if(feedbacks?.length){html+=feedbacks.map(f=>`<div style="background:var(--warm);border-radius:var(--r);padding:7px 12px;margin-bottom:4px;font-size:12px"><strong>${f.esercizio_key}</strong> ${f.emoji||''} ${f.testo?`— "${f.testo}"`:''}  <span style="color:var(--text3)">${new Date(f.created_at).toLocaleDateString('it-IT')}</span></div>`).join('');}
-    else html+=`<div style="font-size:13px;color:var(--text3);font-style:italic">Nessun feedback</div>`;
-    html+='</div>';
+    // Pesi — raggruppati per esercizio, collapsibili
+    const byExAll={};pesi?.forEach(p=>{if(!byExAll[p.esercizio_nome])byExAll[p.esercizio_nome]=[];byExAll[p.esercizio_nome].push({kg:p.kg,data:p.data_registrazione});});
+    html+=`<details style="margin-bottom:16px;border:1.5px solid var(--border);border-radius:var(--r2);overflow:hidden">
+      <summary style="padding:10px 14px;cursor:pointer;background:var(--warm);font-size:11px;text-transform:uppercase;letter-spacing:0.06em;color:var(--text3);font-weight:600;list-style:none;display:flex;justify-content:space-between;align-items:center">
+        <span>💪 PESI REGISTRATI (${Object.keys(byExAll).length} esercizi)</span><span style="font-size:12px">▼</span>
+      </summary>
+      <div style="padding:10px 14px;background:var(--bg2)">`;
+    if(Object.keys(byExAll).length){Object.entries(byExAll).forEach(([ex,records])=>{
+      const last=records[0];const best=Math.max(...records.map(r=>r.kg));
+      html+=`<details style="margin-bottom:6px;border:1px solid var(--border);border-radius:var(--r);overflow:hidden">
+        <summary style="padding:8px 12px;cursor:pointer;background:var(--warm);font-size:12px;font-weight:600;list-style:none;display:flex;justify-content:space-between">
+          <span>${ex}</span><span style="color:var(--rose)">max ${best}kg</span>
+        </summary>
+        <div style="padding:6px 12px;background:var(--bg2)">
+          ${records.map(r=>`<div style="font-size:12px;padding:3px 0;display:flex;justify-content:space-between;border-bottom:1px solid var(--border)"><span style="color:var(--text3)">${r.data}</span><strong>${r.kg}kg</strong></div>`).join('')}
+        </div></details>`;
+    });}
+    else html+=`<div style="font-size:13px;color:var(--text3);font-style:italic;padding:8px 0">Nessun peso registrato</div>`;
+    html+='</div></details>';
+    // Feedback — collapsibili per data
+    html+=`<details style="margin-bottom:16px;border:1.5px solid var(--border);border-radius:var(--r2);overflow:hidden">
+      <summary style="padding:10px 14px;cursor:pointer;background:var(--warm);font-size:11px;text-transform:uppercase;letter-spacing:0.06em;color:var(--text3);font-weight:600;list-style:none;display:flex;justify-content:space-between;align-items:center">
+        <span>💬 FEEDBACK ALLENAMENTO (${feedbacks?.length||0})</span><span style="font-size:12px">▼</span>
+      </summary>
+      <div style="padding:10px 14px;background:var(--bg2)">`;
+    if(feedbacks?.length){html+=feedbacks.map(f=>`<div style="background:var(--warm);border-radius:var(--r);padding:7px 12px;margin-bottom:4px;font-size:12px;display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap">
+      <span><strong>${f.esercizio_key}</strong> ${f.emoji||''} ${f.testo?`— "${f.testo}"`:''}  </span>
+      <span style="color:var(--text3);white-space:nowrap">${new Date(f.created_at).toLocaleDateString('it-IT')}</span>
+    </div>`).join('');}
+    else html+=`<div style="font-size:13px;color:var(--text3);font-style:italic;padding:8px 0">Nessun feedback</div>`;
+    html+='</div></details>';
     mc.innerHTML=html;
   }catch(e){mc.innerHTML=`<div style="color:red;padding:20px">Errore: ${e.message}</div>`;}
 }
@@ -2983,109 +3019,96 @@ initApp();
 // Listen for Supabase real-time chat messages
 async function setupRealtimeChat(){
   if(!user?.id)return;
-  supa.channel('realtime_msgs_'+user.id)
-    .on('postgres_changes',{event:'INSERT',schema:'public',table:'messaggi',filter:`destinatario_id=eq.${user.id}`},payload=>{
-      const m=payload.new;
-      // IMPORTANT: ignore messages I sent myself (can happen if filter is unset in Supabase replication)
-      if(m.mittente_id===user.id)return;
-      const t=new Date(m.created_at||Date.now()).toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'});
-      if(role==='cliente'){
-        chatMsgs.push({from:'coach',text:m.testo||'',time:t,type:m.tipo||'text'});
-        ss('chat',chatMsgs);
-        if(page==='chat')renderChat();
-        else{addNotif('chat');toast('💬 Nuovo messaggio da Annalisa!');}
+  // UN SOLO canale per tutto — evita TIMED_OUT da troppi canali WebSocket
+  const ch=supa.channel('all_updates_'+user.id);
+
+  // ── MESSAGGI (tutti) ──
+  ch.on('postgres_changes',{event:'INSERT',schema:'public',table:'messaggi'},payload=>{
+    const m=payload.new;
+    if(m.mittente_id===user.id)return; // ignora messaggi inviati da me
+    if(m.destinatario_id!==user.id)return; // ignora messaggi non per me
+    const t=new Date(m.created_at||Date.now()).toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'});
+    if(role==='cliente'){
+      chatMsgs.push({from:'coach',text:m.testo||'',time:t,type:m.tipo||'text'});
+      ss('chat',chatMsgs);
+      if(page==='chat')renderChat();
+      else{addNotif('chat');toast('💬 Nuovo messaggio da Annalisa!');}
+    } else {
+      const senderId=m.mittente_id;
+      const senderName=clientiList.find(c=>c.id===senderId)?.name||'Cliente';
+      if(!adminChatData[senderId])adminChatData[senderId]={msgs:[]};
+      adminChatData[senderId].msgs.push({from:'cliente',text:m.testo||'',time:t,type:m.tipo||'text'});
+      if(page==='admin-chat'){
+        renderAdminChat();
+        if(adminChatClienteId===senderId)renderAdminChatMsgs();
+        else{notifState.counts['admin-chat-'+senderId]=(notifState.counts['admin-chat-'+senderId]||0)+1;renderAdminChat();}
       } else {
-        const senderId=m.mittente_id;
-        const senderName=clientiList.find(c=>c.id===senderId)?.name||'Cliente';
-        if(!adminChatData[senderId])adminChatData[senderId]={msgs:[]};
-        adminChatData[senderId].msgs.push({from:'cliente',text:m.testo||'',time:t,type:m.tipo||'text'});
-        if(page==='admin-chat'){
-          renderAdminChat();
-          if(adminChatClienteId===senderId)renderAdminChatMsgs();
-          else{notifState.counts['admin-chat-'+senderId]=(notifState.counts['admin-chat-'+senderId]||0)+1;renderAdminChat();}
-        } else {
-          addNotif('admin-chat');
-          toast('💬 Nuovo messaggio da '+senderName.split(' ')[0]+'!');
-        }
+        addNotif('admin-chat');
+        toast('💬 Nuovo messaggio da '+senderName.split(' ')[0]+'!');
       }
-    })
-    .subscribe((status,err)=>{
-      if(err)console.warn('Realtime subscribe error:',err);
-    });
+    }
+  });
 
-  // ── Realtime per CLIENTI: scheda, piano, promemoria ──
   if(role==='cliente'){
-    supa.channel('cliente_updates_'+user.id)
-      .on('postgres_changes',{event:'INSERT',schema:'public',table:'schede'},payload=>{
-        if(payload.new?.cliente_id!==user.id)return;
-        if(page!=='allenamento'){addNotif('allenamento',1);toast('📋 Annalisa ha assegnato una nuova scheda!');}
-        else loadUserData().then(()=>renderWorkout());
-      })
-      .on('postgres_changes',{event:'UPDATE',schema:'public',table:'schede'},payload=>{
-        if(payload.new?.cliente_id!==user.id)return;
-        if(page!=='allenamento'){addNotif('allenamento',1);toast('📋 La tua scheda è stata aggiornata!');}
-        else loadUserData().then(()=>renderWorkout());
-      })
-      .on('postgres_changes',{event:'INSERT',schema:'public',table:'piani_alimentari'},payload=>{
-        if(payload.new?.cliente_id!==user.id)return;
-        if(page!=='piano'){addNotif('piano',1);toast('🥗 Annalisa ha assegnato un piano alimentare!');}
-      })
-      .on('postgres_changes',{event:'UPDATE',schema:'public',table:'piani_alimentari'},payload=>{
-        if(payload.new?.cliente_id!==user.id)return;
-        if(page!=='piano'){addNotif('piano',1);toast('🥗 Il tuo piano alimentare è stato aggiornato!');}
-      })
-      .on('postgres_changes',{event:'INSERT',schema:'public',table:'promemoria'},payload=>{
-        if(payload.new?.cliente_id!==user.id)return;
-        addNotif('home',1);toast('🔔 Nuovo promemoria da Annalisa!');
-      })
-      .subscribe((status,err)=>{
-        if(status==='SUBSCRIBED') console.log('✅ Realtime cliente attivo');
-        if(err||status==='CHANNEL_ERROR') console.warn('❌ Realtime cliente errore:',err||status);
-        if(status==='TIMED_OUT') console.warn('⚠️ Realtime cliente timeout');
-      });
+    // ── SCHEDE ──
+    ch.on('postgres_changes',{event:'INSERT',schema:'public',table:'schede'},payload=>{
+      if(payload.new?.cliente_id!==user.id)return;
+      if(page!=='allenamento'){addNotif('allenamento',1);toast('📋 Annalisa ha assegnato una nuova scheda!');}
+      else loadUserData().then(()=>renderWorkout());
+    });
+    ch.on('postgres_changes',{event:'UPDATE',schema:'public',table:'schede'},payload=>{
+      if(payload.new?.cliente_id!==user.id)return;
+      if(page!=='allenamento'){addNotif('allenamento',1);toast('📋 La tua scheda è stata aggiornata!');}
+      else loadUserData().then(()=>renderWorkout());
+    });
+    // ── PIANO ALIMENTARE ──
+    ch.on('postgres_changes',{event:'INSERT',schema:'public',table:'piani_alimentari'},payload=>{
+      if(payload.new?.cliente_id!==user.id)return;
+      if(page!=='piano'){addNotif('piano',1);toast('🥗 Annalisa ha assegnato un piano alimentare!');}
+    });
+    ch.on('postgres_changes',{event:'UPDATE',schema:'public',table:'piani_alimentari'},payload=>{
+      if(payload.new?.cliente_id!==user.id)return;
+      if(page!=='piano'){addNotif('piano',1);toast('🥗 Il tuo piano alimentare è stato aggiornato!');}
+    });
+    // ── PROMEMORIA ──
+    ch.on('postgres_changes',{event:'INSERT',schema:'public',table:'promemoria'},payload=>{
+      if(payload.new?.cliente_id!==user.id)return;
+      addNotif('home',1);toast('🔔 Nuovo promemoria da Annalisa!');
+    });
   }
 
-  // ── Realtime per COACH: check-in, anamnesi, feedback ──
   if(role==='admin'){
-    console.log('🔧 Setup canale Realtime coach...');
-    supa.channel('coach_updates_'+user.id)
-      .on('postgres_changes',{event:'*',schema:'public',table:'checkins'},payload=>{
-        console.log('📥 COACH evento checkins:',payload.eventType, payload.new);
-        if(payload.eventType!=='INSERT')return;
-        const cn=clientiList.find(c=>c.id===payload.new?.cliente_id)?.name?.split(' ')[0]||'Una cliente';
-        if(page!=='admin-checkins'){addNotif('admin-checkins',1);toast('📊 '+cn+' ha inviato un check-in!');}
-      })
-      .on('postgres_changes',{event:'*',schema:'public',table:'anamnesi'},payload=>{
-        console.log('📥 COACH evento anamnesi:',payload.eventType, payload.new);
-        if(payload.eventType==='INSERT'){
-          if(page!=='admin-questionari'){addNotif('admin-questionari',1);toast('📝 Nuova anamnesi ricevuta!');}
-        } else if(payload.eventType==='UPDATE'){
-          if(page!=='admin-questionari'){addNotif('admin-questionari',1);toast('📝 Anamnesi aggiornata!');}
-        }
-      })
-      .on('postgres_changes',{event:'*',schema:'public',table:'check_questionari'},payload=>{
-        console.log('📥 COACH evento check_questionari:',payload.eventType, payload.new);
-        if(payload.eventType!=='INSERT')return;
-        if(page!=='admin-questionari'){addNotif('admin-questionari',1);toast('📝 Nuovo questionario check ricevuto!');}
-      })
-      .on('postgres_changes',{event:'*',schema:'public',table:'feedback_esercizi'},payload=>{
-        console.log('📥 COACH evento feedback:',payload.eventType, payload.new);
-        if(payload.eventType!=='INSERT')return;
-        const cn=clientiList.find(c=>c.id===payload.new?.cliente_id)?.name?.split(' ')[0]||'Una cliente';
-        if(page!=='admin-feedback'){addNotif('admin-feedback',1);toast('💬 '+cn+' ha lasciato un feedback!');}
-      })
-      .on('postgres_changes',{event:'*',schema:'public',table:'messaggi'},payload=>{
-        console.log('📥 COACH evento messaggi:',payload.eventType, payload.new?.destinatario_id, 'vs', user.id);
-        if(payload.eventType!=='INSERT')return;
-        if(payload.new?.destinatario_id!==user.id)return;
-        if(page!=='admin-chat'){addNotif('admin-chat',1);toast('💬 Nuovo messaggio da una cliente!');}
-      })
-      .subscribe((status,err)=>{
-        console.log('🔔 Realtime coach status:', status, err||'');
-        if(status==='SUBSCRIBED') console.log('✅ Realtime coach attivo');
-        if(err||status==='CHANNEL_ERROR') console.warn('❌ Realtime coach errore:',err||status);
-      });
+    // ── CHECK-IN ──
+    ch.on('postgres_changes',{event:'INSERT',schema:'public',table:'checkins'},payload=>{
+      const cn=clientiList.find(c=>c.id===payload.new?.cliente_id)?.name?.split(' ')[0]||'Una cliente';
+      if(page!=='admin-checkins'){addNotif('admin-checkins',1);toast('📊 '+cn+' ha inviato un check-in!');}
+    });
+    // ── ANAMNESI ──
+    ch.on('postgres_changes',{event:'INSERT',schema:'public',table:'anamnesi'},()=>{
+      if(page!=='admin-questionari'){addNotif('admin-questionari',1);toast('📝 Nuova anamnesi ricevuta!');}
+    });
+    ch.on('postgres_changes',{event:'UPDATE',schema:'public',table:'anamnesi'},()=>{
+      if(page!=='admin-questionari'){addNotif('admin-questionari',1);toast('📝 Anamnesi aggiornata!');}
+    });
+    // ── QUESTIONARI CHECK ──
+    ch.on('postgres_changes',{event:'INSERT',schema:'public',table:'check_questionari'},()=>{
+      if(page!=='admin-questionari'){addNotif('admin-questionari',1);toast('📝 Nuovo questionario check ricevuto!');}
+    });
+    // ── FEEDBACK ──
+    ch.on('postgres_changes',{event:'INSERT',schema:'public',table:'feedback_esercizi'},payload=>{
+      const cn=clientiList.find(c=>c.id===payload.new?.cliente_id)?.name?.split(' ')[0]||'Una cliente';
+      if(page!=='admin-feedback'){addNotif('admin-feedback',1);toast('💬 '+cn+' ha lasciato un feedback!');}
+    });
   }
+
+  ch.subscribe((status,err)=>{
+    if(status==='SUBSCRIBED') console.log('✅ Realtime attivo (canale unificato)');
+    if(status==='TIMED_OUT'){
+      console.warn('⚠️ Realtime timeout — riconnessione in 3s...');
+      setTimeout(()=>{ supa.removeChannel(ch); setupRealtimeChat(); }, 3000);
+    }
+    if(err||status==='CHANNEL_ERROR') console.warn('❌ Realtime errore:',err||status);
+  });
 }
 </script>
 </body>
