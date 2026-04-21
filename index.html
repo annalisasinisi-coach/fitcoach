@@ -3040,9 +3040,10 @@ async function setupRealtimeChat(){
     const ch=supa.channel(name);
     setupFn(ch);
     ch.subscribe((status,err)=>{
+      console.log('[Realtime]',name,status,err||'');
       if(status==='TIMED_OUT'||status==='CHANNEL_ERROR'){
-        console.warn('⚠️ Realtime '+name+' '+status+' — riconnessione in 4s...');
-        setTimeout(()=>{supa.removeChannel(ch);makeChannel(name,setupFn);},4000);
+        console.warn('⚠️ Riconnessione canale',name,'in 5s...');
+        setTimeout(()=>{try{supa.removeChannel(ch);}catch(e){}makeChannel(name,setupFn);},5000);
       }
     });
     return ch;
@@ -3050,7 +3051,7 @@ async function setupRealtimeChat(){
 
   // ── CANALE MESSAGGI (sempre, per tutti) ──
   makeChannel('msgs_'+user.id, ch=>{
-    ch.on('postgres_changes',{event:'INSERT',schema:'public',table:'messaggi',filter:`destinatario_id=eq.${user.id}`},payload=>{
+    ch.on('postgres_changes',{event:'INSERT',schema:'public',table:'messaggi'},payload=>{
       const m=payload.new;
       if(m.mittente_id===user.id)return;
       const t=new Date(m.created_at||Date.now()).toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'});
@@ -3079,21 +3080,23 @@ async function setupRealtimeChat(){
   // ── CANALE CLIENTE (schede, piano, promemoria) ──
   if(myRole==='cliente'){
     makeChannel('cliente_'+user.id, ch=>{
-      ch.on('postgres_changes',{event:'INSERT',schema:'public',table:'schede',filter:`cliente_id=eq.${user.id}`},payload=>{
+      ch.on('postgres_changes',{event:'INSERT',schema:'public',table:'schede'},payload=>{
+        if(payload.new?.cliente_id!==user.id)return;
         if(page!=='allenamento'){addNotif('allenamento',1);toast('📋 Annalisa ha assegnato una nuova scheda!');}
         else loadUserData().then(()=>renderWorkout());
       });
-      ch.on('postgres_changes',{event:'UPDATE',schema:'public',table:'schede',filter:`cliente_id=eq.${user.id}`},payload=>{
+      ch.on('postgres_changes',{event:'UPDATE',schema:'public',table:'schede'},payload=>{
+        if(payload.new?.cliente_id!==user.id)return;
         if(page!=='allenamento'){addNotif('allenamento',1);toast('📋 La tua scheda è stata aggiornata!');}
         else loadUserData().then(()=>renderWorkout());
       });
-      ch.on('postgres_changes',{event:'INSERT',schema:'public',table:'piani_alimentari',filter:`cliente_id=eq.${user.id}`},()=>{
+      ch.on('postgres_changes',{event:'INSERT',schema:'public',table:'piani_alimentari'},payload=>{
         if(page!=='piano'){addNotif('piano',1);toast('🥗 Annalisa ha assegnato un piano alimentare!');}
       });
-      ch.on('postgres_changes',{event:'UPDATE',schema:'public',table:'piani_alimentari',filter:`cliente_id=eq.${user.id}`},()=>{
+      ch.on('postgres_changes',{event:'UPDATE',schema:'public',table:'piani_alimentari'},payload=>{
         if(page!=='piano'){addNotif('piano',1);toast('🥗 Il tuo piano alimentare è stato aggiornato!');}
       });
-      ch.on('postgres_changes',{event:'INSERT',schema:'public',table:'promemoria',filter:`cliente_id=eq.${user.id}`},()=>{
+      ch.on('postgres_changes',{event:'INSERT',schema:'public',table:'promemoria'},payload=>{
         addNotif('home',1);toast('🔔 Nuovo promemoria da Annalisa!');
       });
     });
