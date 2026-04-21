@@ -3053,7 +3053,9 @@ async function setupRealtimeChat(){
   makeChannel('msgs_'+user.id, ch=>{
     ch.on('postgres_changes',{event:'INSERT',schema:'public',table:'messaggi'},payload=>{
       const m=payload.new;
+      console.log('[MSGS] INSERT destinatario='+m.destinatario_id+' mittente='+m.mittente_id+' io='+user.id);
       if(m.mittente_id===user.id)return;
+      if(m.destinatario_id!==user.id)return;
       const t=new Date(m.created_at||Date.now()).toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'});
       if(myRole==='cliente'){
         chatMsgs.push({from:'coach',text:m.testo||'',time:t,type:m.tipo||'text'});
@@ -3106,20 +3108,25 @@ async function setupRealtimeChat(){
   if(myRole==='admin'){
     makeChannel('coach_'+user.id, ch=>{
       ch.on('postgres_changes',{event:'INSERT',schema:'public',table:'checkins'},payload=>{
-        if(payload.new?.cliente_id===user.id)return; // non notificare azioni proprie
+        console.log('[COACH] checkins INSERT',payload.new);
+        if(payload.new?.cliente_id===user.id)return;
         const cn=clientiList.find(c=>c.id===payload.new?.cliente_id)?.name?.split(' ')[0]||'Una cliente';
         if(page!=='admin-checkins'){addNotif('admin-checkins',1);toast('📊 '+cn+' ha inviato le misure!');}
       });
-      ch.on('postgres_changes',{event:'INSERT',schema:'public',table:'anamnesi'},()=>{
+      ch.on('postgres_changes',{event:'INSERT',schema:'public',table:'anamnesi'},payload=>{
+        console.log('[COACH] anamnesi INSERT',payload.new);
         if(page!=='admin-questionari'){addNotif('admin-questionari',1);toast('📝 Nuova anamnesi ricevuta!');}
       });
-      ch.on('postgres_changes',{event:'UPDATE',schema:'public',table:'anamnesi'},()=>{
+      ch.on('postgres_changes',{event:'UPDATE',schema:'public',table:'anamnesi'},payload=>{
+        console.log('[COACH] anamnesi UPDATE',payload.new);
         if(page!=='admin-questionari'){addNotif('admin-questionari',1);toast('📝 Anamnesi aggiornata!');}
       });
-      ch.on('postgres_changes',{event:'INSERT',schema:'public',table:'check_questionari'},()=>{
+      ch.on('postgres_changes',{event:'INSERT',schema:'public',table:'check_questionari'},payload=>{
+        console.log('[COACH] check_questionari INSERT',payload.new);
         if(page!=='admin-questionari'){addNotif('admin-questionari',1);toast('📝 Nuovo questionario check ricevuto!');}
       });
       ch.on('postgres_changes',{event:'INSERT',schema:'public',table:'feedback_esercizi'},payload=>{
+        console.log('[COACH] feedback INSERT',payload.new);
         const cn=clientiList.find(c=>c.id===payload.new?.cliente_id)?.name?.split(' ')[0]||'Una cliente';
         if(page!=='admin-feedback'){addNotif('admin-feedback',1);toast('💬 '+cn+' ha lasciato un feedback!');}
       });
