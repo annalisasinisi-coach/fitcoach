@@ -509,7 +509,10 @@ input,textarea,select{font-family:'DM Sans',sans-serif}
 
       <!-- ALLENAMENTO -->
       <div class="page" id="page-allenamento">
-        <div class="page-title">Scheda di allenamento</div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+          <div class="page-title" style="margin-bottom:0">Scheda di allenamento</div>
+          <button class="btn-ghost" onclick="printScheda()" style="font-size:12px;padding:5px 10px">🖨️ PDF</button>
+        </div>
         <div class="page-sub" id="workout-sub">Caricamento...</div>
         <div class="meso-banner" id="meso-banner">
           <div style="flex:1"><div style="font-size:15px;font-weight:600;color:var(--text)" id="meso-disp-name">—</div><div style="font-size:12px;color:var(--text2)" id="meso-disp-meta">—</div></div>
@@ -740,7 +743,7 @@ input,textarea,select{font-family:'DM Sans',sans-serif}
           <input type="text" id="lib-search" placeholder="🔍 Cerca esercizio..." oninput="renderLibrary()" style="background:#fff;border:1.5px solid var(--border);border-radius:var(--r);padding:9px 14px;color:var(--text);font-size:13px;outline:none;flex:1;min-width:160px">
           <div style="display:flex;gap:8px;flex-wrap:wrap">
             <select id="lib-cat" onchange="renderLibrary()" style="background:#fff;border:1.5px solid var(--border);border-radius:var(--r);padding:9px 12px;color:var(--text);font-size:13px;outline:none">
-              <option value="">Tutte le categorie</option><option>Lower Body</option><option>Upper Push</option><option>Upper Pull</option><option>Core</option><option>Full Body</option><option>Cardio</option>
+              <option value="">Tutte le categorie</option><option>Lower Body</option><option>Upper Body</option><option>Core</option><option>Cardio</option><option>Stretching</option><option>Warm Up</option>
             </select>
             <button class="btn-ghost" onclick="seedExercises()" title="Importa 330 esercizi preset">📥 Importa preset</button>
             <button class="btn-primary" onclick="openNewExModal()">+ Nuovo esercizio</button>
@@ -922,7 +925,7 @@ input,textarea,select{font-family:'DM Sans',sans-serif}
   <div class="modal-box">
     <div class="modal-title">➕ Nuovo esercizio <button class="modal-close" onclick="closeNewExModal()">×</button></div>
     <div class="field"><label>Nome esercizio</label><input type="text" id="new-ex-name" placeholder="es. Hip Thrust con bilanciere"></div>
-    <div class="field"><label>Categoria</label><select id="new-ex-cat"><option>Lower Body</option><option>Upper Push</option><option>Upper Pull</option><option>Core</option><option>Full Body</option><option>Cardio</option></select></div>
+    <div class="field"><label>Categoria</label><select id="new-ex-cat"><option>Lower Body</option><option>Upper Body</option><option>Core</option><option>Cardio</option><option>Stretching</option><option>Warm Up</option></select></div>
     <div class="field"><label>URL Video YouTube (opzionale)</label><input type="url" id="new-ex-video" placeholder="https://www.youtube.com/watch?v=..."></div>
     <div class="field"><label>Note tecniche</label><textarea id="new-ex-desc" placeholder="Come eseguire correttamente..."></textarea></div>
     <div style="display:flex;gap:8px;margin-top:4px">
@@ -2835,7 +2838,10 @@ async function viewClient(clientId, clientName){
         </div>`;
       }).join('');
       html+=`<div style="background:linear-gradient(135deg,var(--violet-pale),var(--rose-pale));border-radius:var(--r);padding:10px 14px;margin-bottom:8px">
-        <div style="font-weight:600;margin-bottom:2px">${s.nome}</div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px">
+          <div style="font-weight:600">${s.nome}</div>
+          <button class="btn-ghost" style="font-size:11px;padding:4px 8px" onclick="printSchedaData(${JSON.stringify(s).replace(/'/g,'&#39;')},'${nome}')">🖨️ PDF</button>
+        </div>
         <div style="font-size:12px;color:var(--text2);margin-bottom:10px">Sett. ${s.current_week||1}/${s.weeks||4} · ${s.giorni?.length||0} giorni · ${(s.giorni||[]).reduce((tot,g)=>tot+(g.esercizi||[]).length,0)} esercizi totali</div>
         ${giorniHtml}
         ${s.note_globali?`<div style="font-size:11px;color:var(--text2);margin-top:8px;padding-top:8px;border-top:1px solid rgba(0,0,0,0.08)">📋 Note: ${s.note_globali}</div>`:''}
@@ -3133,6 +3139,60 @@ async function setupRealtimeChat(){
     });
   }
 }
+// ══════════════════════════════════
+// STAMPA SCHEDA PDF
+// ══════════════════════════════════
+function printScheda(){
+  printSchedaData(currentMeso, '');
+}
+function printSchedaData(s, clienteName){
+  if(!s||!s.giorni?.length){toast('❌ Nessuna scheda da stampare');return;}
+  const giorni=s.giorni||[];
+  const giornoHtml=g=>{
+    if(g.tipo==='riposo') return `<tr><td colspan="6" style="padding:10px 8px;background:#FDF0F5;font-style:italic;color:#C07040">😴 ${g.label} — ${g.nome||'Riposo'}</td></tr>`;
+    const exRows=(g.esercizi||[]).map((ex,i)=>`
+      <tr style="border-bottom:1px solid #F0E8E0">
+        <td style="padding:6px 8px;font-size:12px;font-weight:600;color:#2D1F14">${i===0?`<strong>${g.label}${g.nome?' — '+g.nome:''}</strong>`:'&nbsp;'}</td>
+        <td style="padding:6px 8px;font-size:13px">${ex.name}</td>
+        <td style="padding:6px 8px;font-size:12px;text-align:center">${ex.sets||'—'}</td>
+        <td style="padding:6px 8px;font-size:12px;text-align:center">${ex.reps||'—'}</td>
+        <td style="padding:6px 8px;font-size:12px;text-align:center">${ex.recupero||'—'}</td>
+        <td style="padding:6px 8px;font-size:12px;text-align:center">${ex.rpe||'—'}</td>
+      </tr>
+      ${ex.note?`<tr><td></td><td colspan="5" style="padding:2px 8px 6px;font-size:11px;color:#9A7A68;font-style:italic">📝 ${ex.note}</td></tr>`:''}`
+    ).join('');
+    return exRows + (g.note?`<tr><td colspan="6" style="padding:4px 8px 8px;font-size:11px;color:#7B3FA0;font-style:italic;background:#F7F0FF">📝 Note giorno: ${g.note}</td></tr>`:'');
+  };
+  const html=`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Scheda — ${s.nome}<\/title>
+  <style>
+    body{font-family:'Helvetica Neue',sans-serif;padding:32px;color:#2D1F14;max-width:900px;margin:0 auto}
+    h1{color:#E8527A;font-size:22px;margin-bottom:2px}
+    h2{color:#7B3FA0;font-size:14px;font-weight:400;margin-bottom:4px}
+    h3{font-size:13px;color:#9A7A68;font-weight:400;margin-bottom:20px}
+    table{width:100%;border-collapse:collapse;margin-bottom:24px;font-size:13px}
+    thead th{background:#F7EEF5;color:#7B3FA0;padding:7px 8px;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:0.05em}
+    tr:hover td{background:#FDF8F4}
+    .footer{margin-top:32px;font-size:11px;color:#B8A89A;border-top:1px solid #EDE0D8;padding-top:12px}
+    @media print{body{padding:16px}}
+  <\/style><\/head><body>
+  <h1>Annalisa Sinisi Fit Coach</h1>
+  <h2>${s.nome}${clienteName?' — '+clienteName:''}</h2>
+  <h3>Settimana ${s.current_week||1} di ${s.weeks||4} · ${giorni.length} giorni · ${giorni.reduce((t,g)=>t+(g.esercizi||[]).length,0)} esercizi totali${s.startDate?' · Dal '+new Date(s.startDate).toLocaleDateString('it-IT',{day:'numeric',month:'long',year:'numeric'}):''}</h3>
+  <table>
+    <thead><tr><th>Giorno</th><th>Esercizio</th><th>Serie</th><th>Reps</th><th>Recupero</th><th>RPE</th></tr></thead>
+    <tbody>${giorni.map(giornoHtml).join('')}</tbody>
+  </table>
+  ${s.note_globali?`<div style="background:#F7F0FF;border-left:4px solid #7B3FA0;padding:10px 14px;border-radius:4px;font-size:12px;color:#5A3A80;margin-bottom:24px"><strong>Note generali:</strong> ${s.note_globali}</div>`:''}
+  <div class="footer">Stampato il ${new Date().toLocaleDateString('it-IT',{day:'numeric',month:'long',year:'numeric',hour:'2-digit',minute:'2-digit'})} · annalisasinisi.coach</div>
+  <\/body><\/html>`;
+  const win=window.open('','_blank');
+  if(!win){toast('❌ Abilita i popup per stampare');return;}
+  win.document.write(html);
+  win.document.close();
+  setTimeout(()=>win.print(),500);
+}
+
+
 </script>
 </body>
 </html>
