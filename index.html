@@ -2803,6 +2803,7 @@ async function viewClient(clientId, clientName){
       supa.from('piani_alimentari').select('*').eq('cliente_id',clientId).order('updated_at',{ascending:false}).limit(1)
     ]);
     console.log('viewClient data:', {prof,ci:ci?.length,scheda:scheda?.length,pesi:pesi?.length,feedbacks:feedbacks?.length,piano:piano?.length});
+    window._lastSchedaCoach = scheda?.[0] || null;
     const p=prof||{};
     const nome=((p.nome||'')+(p.cognome?' '+p.cognome:'')).trim()||clientName||'Cliente';
     let html=`<div style="display:flex;align-items:center;gap:16px;margin-bottom:24px;padding-bottom:20px;border-bottom:1px solid var(--border)">
@@ -2840,7 +2841,7 @@ async function viewClient(clientId, clientName){
       html+=`<div style="background:linear-gradient(135deg,var(--violet-pale),var(--rose-pale));border-radius:var(--r);padding:10px 14px;margin-bottom:8px">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px">
           <div style="font-weight:600">${s.nome}</div>
-          <button class="btn-ghost" style="font-size:11px;padding:4px 8px" onclick="printSchedaData(${JSON.stringify(s).replace(/'/g,'&#39;')},'${nome}')">🖨️ PDF</button>
+          <button class="btn-ghost" style="font-size:11px;padding:4px 8px" onclick="printSchedaData(window._lastSchedaCoach,'${nome}')">🖨️ PDF</button>
         </div>
         <div style="font-size:12px;color:var(--text2);margin-bottom:10px">Sett. ${s.current_week||1}/${s.weeks||4} · ${s.giorni?.length||0} giorni · ${(s.giorni||[]).reduce((tot,g)=>tot+(g.esercizi||[]).length,0)} esercizi totali</div>
         ${giorniHtml}
