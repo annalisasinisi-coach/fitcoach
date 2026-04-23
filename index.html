@@ -545,14 +545,37 @@ input,textarea,select{font-family:'DM Sans',sans-serif}
         <div class="page-title">I tuoi progressi</div>
         <div class="page-sub">Evoluzione dei carichi e del corpo nel tempo</div>
         <!-- Periodo -->
-        <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap">
-          <button class="day-tab active" id="period-btn-3" onclick="setPeriod(3,this)">3 mesi</button>
-          <button class="day-tab" id="period-btn-6" onclick="setPeriod(6,this)">6 mesi</button>
-          <button class="day-tab" id="period-btn-12" onclick="setPeriod(12,this)">1 anno</button>
-          <button class="day-tab" id="period-btn-0" onclick="setPeriod(0,this)">Tutto</button>
+        <div class="card" style="margin-bottom:14px;padding:12px 16px">
+          <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.06em;color:var(--text3);font-weight:600;margin-bottom:8px">📅 Periodo visualizzato</div>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <div style="display:flex;flex-direction:column;gap:3px;flex:1;min-width:120px">
+              <label style="font-size:11px;color:var(--text3)">Dal</label>
+              <input type="date" id="period-from" style="padding:7px 10px;border:1.5px solid var(--border);border-radius:var(--r2);background:var(--bg2);color:var(--text);font-size:13px;font-family:inherit" onchange="applyDateRange()">
+            </div>
+            <div style="display:flex;flex-direction:column;gap:3px;flex:1;min-width:120px">
+              <label style="font-size:11px;color:var(--text3)">Al</label>
+              <input type="date" id="period-to" style="padding:7px 10px;border:1.5px solid var(--border);border-radius:var(--r2);background:var(--bg2);color:var(--text);font-size:13px;font-family:inherit" onchange="applyDateRange()">
+            </div>
+          </div>
+          <div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap">
+            <button class="btn-ghost" style="font-size:11px;padding:4px 10px" onclick="setPreset(1)">1 mese</button>
+            <button class="btn-ghost" style="font-size:11px;padding:4px 10px" onclick="setPreset(3)">3 mesi</button>
+            <button class="btn-ghost" style="font-size:11px;padding:4px 10px" onclick="setPreset(6)">6 mesi</button>
+            <button class="btn-ghost" style="font-size:11px;padding:4px 10px" onclick="setPreset(12)">1 anno</button>
+            <button class="btn-ghost" style="font-size:11px;padding:4px 10px" onclick="setPreset(24)">2 anni</button>
+            <button class="btn-ghost" style="font-size:11px;padding:4px 10px" onclick="setPreset(0)">Tutto</button>
+          </div>
         </div>
         <!-- Grafico pesi esercizi -->
         <div class="card"><div class="card-title">📈 Progressione pesi</div><div style="margin:10px 0 6px"><select id="ex-sel" onchange="selExDropdown(this.value)" style="width:100%;padding:8px 12px;border:1.5px solid var(--border);border-radius:var(--r2);background:var(--bg2);color:var(--text);font-size:13px;font-family:inherit"><option value="">Seleziona esercizio…</option></select></div><div class="chart-wrap"><canvas id="wChart"></canvas></div></div>
+        <!-- Storico completo esercizio -->
+        <div class="card" style="margin-top:14px" id="ex-history-card">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+            <div class="card-title" style="margin:0">📋 Storico sessioni</div>
+            <span style="font-size:11px;color:var(--text3)" id="ex-history-subtitle"></span>
+          </div>
+          <div id="ex-history-list" style="max-height:220px;overflow-y:auto"></div>
+        </div>
         <!-- Grafico corpo: peso + misure insieme -->
         <div class="card" style="margin-top:14px">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
@@ -1442,7 +1465,7 @@ async function navigate(pg){
   // home-msg-date: only show if there's a real message from coach
   if(pg==='home')renderHome();
   if(pg==='allenamento')renderWorkout();
-  if(pg==='progressi')renderCharts();
+  if(pg==='progressi'){initPeriodDefaults();renderCharts();}
   if(pg==='checkin'){renderCiHistory();showCiTab('form',document.getElementById('ci-tab-form'));}
   if(pg==='anamnesi')renderAnamnesi();
   if(pg==='piano')renderPiano();
@@ -1649,31 +1672,73 @@ async function updTimer(){const m=Math.floor(timerSec/60),s=timerSec%60;document
 // ══════════════════════════════════
 const CC={responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#7A5A48',font:{family:'DM Sans',size:11}}}},scales:{x:{ticks:{color:'#B8937A',font:{size:10}},grid:{color:'rgba(180,100,80,0.06)'}},y:{ticks:{color:'#B8937A',font:{size:10}},grid:{color:'rgba(180,100,80,0.06)'}}}};
 let wC=null,bwC=null,mC=null,adhC=null,ciC=null,curEx=Object.keys(weightHist)[0];
-let chartPeriodMonths=3; // default 3 mesi
-function setPeriod(months,btn){
-  chartPeriodMonths=months;
-  document.querySelectorAll('[id^="period-btn-"]').forEach(b=>b.classList.remove('active'));
-  if(btn)btn.classList.add('active');
+let _periodFrom=null, _periodTo=null;
+
+function initPeriodDefaults(){
+  const today=new Date();
+  const from=new Date(today.getFullYear(), today.getMonth(), 1); // inizio mese corrente
+  const maxFrom=new Date(today);
+  maxFrom.setFullYear(maxFrom.getFullYear()-2); // max 2 anni fa
+  const todayStr=today.toISOString().slice(0,10);
+  const fromStr=from.toISOString().slice(0,10);
+  const maxStr=maxFrom.toISOString().slice(0,10);
+  const fi=document.getElementById('period-from');
+  const ti=document.getElementById('period-to');
+  if(fi){fi.value=fromStr;fi.min=maxStr;fi.max=todayStr;}
+  if(ti){ti.value=todayStr;ti.min=maxStr;ti.max=todayStr;}
+  _periodFrom=from;
+  _periodTo=today;
+}
+
+function setPreset(months){
+  const today=new Date();
+  const todayStr=today.toISOString().slice(0,10);
+  let from;
+  if(months===0){
+    from=new Date(2020,0,1); // tutto
+  } else {
+    from=new Date(today);
+    from.setMonth(from.getMonth()-months);
+  }
+  const fromStr=from.toISOString().slice(0,10);
+  const fi=document.getElementById('period-from');
+  const ti=document.getElementById('period-to');
+  if(fi) fi.value=fromStr;
+  if(ti) ti.value=todayStr;
+  _periodFrom=from;
+  _periodTo=today;
   drawWChart();
   drawBodyChart();
 }
+
+function applyDateRange(){
+  const fi=document.getElementById('period-from');
+  const ti=document.getElementById('period-to');
+  if(fi?.value) _periodFrom=new Date(fi.value);
+  if(ti?.value) _periodTo=new Date(ti.value);
+  drawWChart();
+  drawBodyChart();
+}
+
+function parseRawDate(raw){
+  if(!raw) return null;
+  if(raw.includes('/') && raw.length<=5){
+    const [dd,mm]=raw.split('/');
+    return new Date(new Date().getFullYear(),parseInt(mm)-1,parseInt(dd));
+  }
+  const dt=new Date(raw);
+  return isNaN(dt)?null:dt;
+}
+
 function filterByPeriod(arr, dateKey){
-  if(!chartPeriodMonths) return arr;
-  const cutoff=new Date();
-  cutoff.setMonth(cutoff.getMonth()-chartPeriodMonths);
+  if(!_periodFrom&&!_periodTo) return arr;
   return arr.filter(d=>{
     const raw=d[dateKey]||d.date||d.data_checkin||'';
-    if(!raw) return true;
-    // raw può essere "DD/MM" o "YYYY-MM-DD"
-    let dt;
-    if(raw.includes('/') && raw.length<=5){
-      // formato DD/MM — aggiungi anno corrente
-      const [dd,mm]=raw.split('/');
-      dt=new Date(new Date().getFullYear(),parseInt(mm)-1,parseInt(dd));
-    } else {
-      dt=new Date(raw);
-    }
-    return !isNaN(dt)&&dt>=cutoff;
+    const dt=parseRawDate(raw);
+    if(!dt) return true;
+    if(_periodFrom && dt<_periodFrom) return false;
+    if(_periodTo && dt>_periodTo) return false;
+    return true;
   });
 }
 function fmtDate(raw){
@@ -1726,11 +1791,102 @@ function drawBodyChart(){
 }
 async function selExDropdown(n){curEx=n;drawWChart();}
 async function selEx(n,btn){curEx=n;drawWChart();}
+function renderExHistory(){
+  const card=document.getElementById('ex-history-card');
+  const el=document.getElementById('ex-history-list');
+  const sub=document.getElementById('ex-history-subtitle');
+  if(!card||!el) return;
+  const all=weightHist[curEx]||[];
+  if(!curEx||!all.length){
+    card.style.display='none'; return;
+  }
+  card.style.display='';
+  // Mostra tutto lo storico (non filtrato per periodo) in ordine dal più recente
+  const sorted=[...all].reverse();
+  sub.textContent=sorted.length+' sessioni registrate';
+  const best=Math.max(...all.map(d=>d.kg));
+  el.innerHTML=sorted.map((d,i)=>{
+    const isPR=d.kg===best;
+    return `<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--border);font-size:13px">
+      <span style="color:var(--text2)">${fmtDate(d.date)}</span>
+      <span style="font-weight:600;color:${isPR?'var(--rose)':'var(--text)'}">${d.kg} kg ${isPR?'🏆':''}</span>
+    </div>`;
+  }).join('');
+}
+function aggregateWeights(data){
+  // Calcola quanti mesi copre il range selezionato
+  const from=_periodFrom||new Date(2020,0,1);
+  const to=_periodTo||new Date();
+  const diffDays=(to-from)/(1000*60*60*24);
+  const diffMonths=diffDays/30;
+
+  if(diffMonths<=2){
+    // ≤ 2 mesi: ogni punto
+    return data.map(d=>({label:fmtDate(d.date),kg:d.kg}));
+  } else if(diffMonths<=6){
+    // 3-6 mesi: media settimanale
+    const weeks={};
+    data.forEach(d=>{
+      const dt=parseRawDate(d.date);
+      if(!dt) return;
+      // Lunedì della settimana
+      const day=dt.getDay()||7;
+      const mon=new Date(dt);mon.setDate(dt.getDate()-day+1);
+      const key=mon.toISOString().slice(0,10);
+      if(!weeks[key])weeks[key]={sum:0,count:0,dt:mon};
+      weeks[key].sum+=d.kg;weeks[key].count++;
+    });
+    return Object.values(weeks).sort((a,b)=>a.dt-b.dt).map(w=>({
+      label:'Sett. '+w.dt.toLocaleDateString('it-IT',{day:'numeric',month:'short'}),
+      kg:Math.round(w.sum/w.count*10)/10
+    }));
+  } else {
+    // > 6 mesi: media mensile
+    const months={};
+    data.forEach(d=>{
+      const dt=parseRawDate(d.date);
+      if(!dt) return;
+      const key=dt.getFullYear()+'-'+(dt.getMonth()+1).toString().padStart(2,'0');
+      if(!months[key])months[key]={sum:0,count:0,dt:new Date(dt.getFullYear(),dt.getMonth(),1)};
+      months[key].sum+=d.kg;months[key].count++;
+    });
+    return Object.values(months).sort((a,b)=>a.dt-b.dt).map(m=>({
+      label:m.dt.toLocaleDateString('it-IT',{month:'short',year:'numeric'}),
+      kg:Math.round(m.sum/m.count*10)/10
+    }));
+  }
+}
+
 async function drawWChart(){
   const raw=weightHist[curEx]||[];
-  const data=filterByPeriod(raw,'date');
+  const filtered=filterByPeriod(raw,'date');
+  const aggregated=aggregateWeights(filtered);
   if(wC)wC.destroy();
-  wC=new Chart(document.getElementById('wChart'),{type:'line',data:{labels:data.map(d=>fmtDate(d.date)),datasets:[{label:`${curEx} (kg)`,data:data.map(d=>d.kg),borderColor:'#E8527A',backgroundColor:'rgba(232,82,122,0.08)',tension:0.4,pointBackgroundColor:'#E8527A',pointRadius:5,fill:true}]},options:CC});
+
+  // Aggiungi annotazione sul tipo di aggregazione
+  const from=_periodFrom||new Date(2020,0,1);
+  const to=_periodTo||new Date();
+  const diffMonths=(to-from)/(1000*60*60*24*30);
+  const aggLabel=diffMonths<=2?'ogni sessione':diffMonths<=6?'media settimanale':'media mensile';
+
+  wC=new Chart(document.getElementById('wChart'),{
+    type:'line',
+    data:{
+      labels:aggregated.map(d=>d.label),
+      datasets:[{
+        label:`${curEx} (kg) — ${aggLabel}`,
+        data:aggregated.map(d=>d.kg),
+        borderColor:'#E8527A',
+        backgroundColor:'rgba(232,82,122,0.08)',
+        tension:0.4,
+        pointBackgroundColor:'#E8527A',
+        pointRadius:aggregated.length>30?3:5,
+        fill:true
+      }]
+    },
+    options:CC
+  });
+  renderExHistory(); // aggiorna anche storico testuale
 }
 
 // ══════════════════════════════════
