@@ -392,7 +392,8 @@ input,textarea,select{font-family:'DM Sans',sans-serif}
   .timer-custom-row{flex-wrap:wrap}
   /* Chat */
   .chat-input-area{padding:8px}
-  .chat-wrap{max-height:none}
+  .chat-wrap{max-height:none;height:calc(100dvh - 200px)!important}
+  #page-chat .page-title, #page-chat .page-sub{display:none}
   /* Profile grid */
   .emoji-picker{gap:5px}
   /* Q scale buttons */
@@ -543,10 +544,29 @@ input,textarea,select{font-family:'DM Sans',sans-serif}
       <div class="page" id="page-progressi">
         <div class="page-title">I tuoi progressi</div>
         <div class="page-sub">Evoluzione dei carichi e del corpo nel tempo</div>
+        <!-- Periodo -->
+        <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap">
+          <button class="day-tab active" id="period-btn-3" onclick="setPeriod(3,this)">3 mesi</button>
+          <button class="day-tab" id="period-btn-6" onclick="setPeriod(6,this)">6 mesi</button>
+          <button class="day-tab" id="period-btn-12" onclick="setPeriod(12,this)">1 anno</button>
+          <button class="day-tab" id="period-btn-0" onclick="setPeriod(0,this)">Tutto</button>
+        </div>
+        <!-- Grafico pesi esercizi -->
         <div class="card"><div class="card-title">📈 Progressione pesi</div><div style="margin:10px 0 6px"><select id="ex-sel" onchange="selExDropdown(this.value)" style="width:100%;padding:8px 12px;border:1.5px solid var(--border);border-radius:var(--r2);background:var(--bg2);color:var(--text);font-size:13px;font-family:inherit"><option value="">Seleziona esercizio…</option></select></div><div class="chart-wrap"><canvas id="wChart"></canvas></div></div>
-        <div class="grid-2" style="margin-top:14px">
-          <div class="card"><div class="card-title">⚖️ Peso corporeo</div><div class="chart-wrap"><canvas id="bwChart"></canvas></div></div>
-          <div class="card"><div class="card-title">📏 Misure corporee</div><div class="chart-wrap"><canvas id="mChart"></canvas></div></div>
+        <!-- Grafico corpo: peso + misure insieme -->
+        <div class="card" style="margin-top:14px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+            <div class="card-title" style="margin:0">📏 Corpo</div>
+            <select id="misura-sel" onchange="drawBodyChart()" style="padding:5px 10px;border:1.5px solid var(--border);border-radius:var(--r2);background:var(--bg2);color:var(--text);font-size:12px;font-family:inherit">
+              <option value="peso">⚖️ Peso (kg)</option>
+              <option value="vita">Vita (cm)</option>
+              <option value="fianchi">Fianchi (cm)</option>
+              <option value="spalle">Spalle (cm)</option>
+              <option value="glutei">Glutei (cm)</option>
+              <option value="coscia">Coscia (cm)</option>
+            </select>
+          </div>
+          <div class="chart-wrap"><canvas id="bwChart"></canvas></div>
         </div>
       </div>
 
@@ -579,7 +599,15 @@ input,textarea,select{font-family:'DM Sans',sans-serif}
               </div>
               <button class="btn-primary" style="width:100%;margin-top:4px" onclick="saveCheckin()">Salva misure</button>
             </div>
-            <div class="card"><div class="card-title">Storico rapido</div><div id="ci-hist-quick" style="margin-top:10px"></div></div>
+            <div class="card">
+              <details id="storico-rapido-details">
+                <summary style="cursor:pointer;list-style:none;display:flex;justify-content:space-between;align-items:center" onclick="if(this.parentElement.open){}else{renderCiQuickHistory()}">
+                  <div class="card-title" style="margin:0">Storico rapido</div>
+                  <span style="font-size:12px;color:var(--text3)">▼</span>
+                </summary>
+                <div id="ci-hist-quick" style="margin-top:10px"></div>
+              </details>
+            </div>
           </div>
         </div>
         <!-- QUESTIONARIO CHECK -->
@@ -1621,6 +1649,46 @@ async function updTimer(){const m=Math.floor(timerSec/60),s=timerSec%60;document
 // ══════════════════════════════════
 const CC={responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#7A5A48',font:{family:'DM Sans',size:11}}}},scales:{x:{ticks:{color:'#B8937A',font:{size:10}},grid:{color:'rgba(180,100,80,0.06)'}},y:{ticks:{color:'#B8937A',font:{size:10}},grid:{color:'rgba(180,100,80,0.06)'}}}};
 let wC=null,bwC=null,mC=null,adhC=null,ciC=null,curEx=Object.keys(weightHist)[0];
+let chartPeriodMonths=3; // default 3 mesi
+function setPeriod(months,btn){
+  chartPeriodMonths=months;
+  document.querySelectorAll('[id^="period-btn-"]').forEach(b=>b.classList.remove('active'));
+  if(btn)btn.classList.add('active');
+  drawWChart();
+  drawBodyChart();
+}
+function filterByPeriod(arr, dateKey){
+  if(!chartPeriodMonths) return arr;
+  const cutoff=new Date();
+  cutoff.setMonth(cutoff.getMonth()-chartPeriodMonths);
+  return arr.filter(d=>{
+    const raw=d[dateKey]||d.date||d.data_checkin||'';
+    if(!raw) return true;
+    // raw può essere "DD/MM" o "YYYY-MM-DD"
+    let dt;
+    if(raw.includes('/') && raw.length<=5){
+      // formato DD/MM — aggiungi anno corrente
+      const [dd,mm]=raw.split('/');
+      dt=new Date(new Date().getFullYear(),parseInt(mm)-1,parseInt(dd));
+    } else {
+      dt=new Date(raw);
+    }
+    return !isNaN(dt)&&dt>=cutoff;
+  });
+}
+function fmtDate(raw){
+  // Converti qualsiasi formato in "3 apr" o "3 apr 2024"
+  if(!raw) return '';
+  let dt;
+  if(raw.includes('/') && raw.length<=5){
+    const [dd,mm]=raw.split('/');
+    dt=new Date(new Date().getFullYear(),parseInt(mm)-1,parseInt(dd));
+  } else {
+    dt=new Date(raw);
+  }
+  if(isNaN(dt)) return raw;
+  return dt.toLocaleDateString('it-IT',{day:'numeric',month:'short'});
+}
 async function renderCharts(){
   // Esercizi: prima quelli della scheda attiva con dati, poi gli altri con dati storici
   const schedaExNames=currentMeso?.giorni?.flatMap(g=>g.esercizi?.map(e=>e.name)||[])||[];
@@ -1645,13 +1713,25 @@ async function renderCharts(){
     }
   }
   drawWChart();
-  const dates=checkins.map(c=>c.date.slice(5));
-  if(bwC)bwC.destroy();bwC=new Chart(document.getElementById('bwChart'),{type:'line',data:{labels:dates,datasets:[{label:'Peso (kg)',data:checkins.map(c=>c.peso),borderColor:'#E8527A',backgroundColor:'rgba(232,82,122,0.07)',tension:0.4,pointBackgroundColor:'#E8527A',pointRadius:5,fill:true}]},options:CC});
-  if(mC)mC.destroy();mC=new Chart(document.getElementById('mChart'),{type:'line',data:{labels:dates,datasets:[{label:'Vita',data:checkins.map(c=>c.vita),borderColor:'#F5A882',tension:0.4,pointRadius:4},{label:'Fianchi',data:checkins.map(c=>c.fianchi),borderColor:'#7B3FA0',tension:0.4,pointRadius:4},{label:'Spalle',data:checkins.map(c=>c.spalle||0),borderColor:'#E8527A',tension:0.4,pointRadius:4}]},options:CC});
+  drawBodyChart();
+}
+function drawBodyChart(){
+  const misura=(document.getElementById('misura-sel')?.value)||'peso';
+  const labelMap={peso:'⚖️ Peso (kg)',vita:'Vita (cm)',fianchi:'Fianchi (cm)',spalle:'Spalle (cm)',glutei:'Glutei (cm)',coscia:'Coscia (cm)'};
+  const filtered=filterByPeriod([...checkins].map(c=>({...c,date:c.date})),'date');
+  const labels=filtered.map(c=>fmtDate(c.date));
+  const vals=filtered.map(c=>c[misura]||c[misura+'_sx']||0);
+  if(bwC)bwC.destroy();
+  bwC=new Chart(document.getElementById('bwChart'),{type:'line',data:{labels,datasets:[{label:labelMap[misura]||misura,data:vals,borderColor:'#E8527A',backgroundColor:'rgba(232,82,122,0.07)',tension:0.4,pointBackgroundColor:'#E8527A',pointRadius:5,fill:true}]},options:CC});
 }
 async function selExDropdown(n){curEx=n;drawWChart();}
 async function selEx(n,btn){curEx=n;drawWChart();}
-async function drawWChart(){const data=weightHist[curEx]||[];if(wC)wC.destroy();wC=new Chart(document.getElementById('wChart'),{type:'line',data:{labels:data.map(d=>d.date),datasets:[{label:`${curEx} (kg)`,data:data.map(d=>d.kg),borderColor:'#E8527A',backgroundColor:'rgba(232,82,122,0.08)',tension:0.4,pointBackgroundColor:'#E8527A',pointRadius:5,fill:true}]},options:CC});}
+async function drawWChart(){
+  const raw=weightHist[curEx]||[];
+  const data=filterByPeriod(raw,'date');
+  if(wC)wC.destroy();
+  wC=new Chart(document.getElementById('wChart'),{type:'line',data:{labels:data.map(d=>fmtDate(d.date)),datasets:[{label:`${curEx} (kg)`,data:data.map(d=>d.kg),borderColor:'#E8527A',backgroundColor:'rgba(232,82,122,0.08)',tension:0.4,pointBackgroundColor:'#E8527A',pointRadius:5,fill:true}]},options:CC});
+}
 
 // ══════════════════════════════════
 // CHECK-IN TABS
@@ -1684,7 +1764,24 @@ async function saveCheckin(){
 }
 async function renderCiHistory(){
   const el=document.getElementById('ci-history');if(!el)return;
-  el.innerHTML=[...checkins].reverse().map((c,i)=>`<div class="ci-item"><div><div style="font-size:13px;font-weight:600">${new Date(c.date).toLocaleDateString('it-IT',{day:'numeric',month:'long',year:'numeric'})}</div>${i===0?'<span class="badge badge-rose" style="margin-top:4px">Più recente</span>':''}</div><div style="display:flex;gap:10px;flex-wrap:wrap">${[['⚖️',c.peso,'kg'],['Spalle',c.spalle,'cm'],['Vita',c.vita,'cm'],['Fianchi',c.fianchi,'cm'],['Glutei',c.glutei,'cm'],['Coscia',c.coscia,'cm']].filter(x=>x[1]).map(x=>`<div style="font-size:12px;color:var(--text2)">${x[0]} <strong>${x[1]}${x[2]}</strong></div>`).join('')}</div></div>`).join('');
+  const sorted=[...checkins].reverse();
+  if(!sorted.length){el.innerHTML='<div style="text-align:center;padding:20px;color:var(--text3);font-size:13px">Nessun check-in registrato</div>';return;}
+  el.innerHTML=sorted.map((c,i)=>{
+    const dateLabel=new Date(c.date).toLocaleDateString('it-IT',{day:'numeric',month:'long',year:'numeric'});
+    const misure=[['⚖️',c.peso,'kg'],['Spalle',c.spalle,'cm'],['Vita',c.vita,'cm'],['Fianchi',c.fianchi,'cm'],['Glutei',c.glutei,'cm'],['Coscia',c.coscia,'cm']].filter(x=>x[1]);
+    return `<details style="border:1.5px solid var(--border);border-radius:var(--r2);margin-bottom:6px;overflow:hidden" ${i===0?'open':''}>
+      <summary style="padding:10px 14px;cursor:pointer;background:var(--warm);list-style:none;display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <span style="font-size:13px;font-weight:600">${dateLabel}</span>
+          ${i===0?'<span class="badge badge-rose" style="margin-left:8px;font-size:10px">Più recente</span>':''}
+        </div>
+        <span style="font-size:12px;color:var(--rose);font-weight:600">⚖️ ${c.peso}kg</span>
+      </summary>
+      <div style="padding:10px 14px;background:var(--bg2);display:flex;gap:10px;flex-wrap:wrap">
+        ${misure.map(x=>`<div style="font-size:12px;background:var(--warm);padding:4px 10px;border-radius:20px">${x[0]} <strong>${x[1]}${x[2]}</strong></div>`).join('')}
+      </div>
+    </details>`;
+  }).join('');
 }
 
 // ══════════════════════════════════
