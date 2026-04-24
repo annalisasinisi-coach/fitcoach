@@ -1621,9 +1621,8 @@ async function renderDayContentInto(idx, el){
   if(g.tipo==='riposo'){
     el.innerHTML=noteHTML+`<div class="rest-card"><div style="font-size:48px;margin-bottom:12px">😴</div><div style="font-size:20px;font-family:'Playfair Display',serif;color:var(--text);margin-bottom:8px">${g.nome}</div><div style="font-size:13px;color:var(--text2);max-width:320px;margin:0 auto;line-height:1.7">${g.note||'Giornata di recupero.'}</div></div>`;return;
   }
-  el.innerHTML=noteHTML+(g.esercizi||[]).length===0?'<div style="color:var(--text3);font-style:italic;padding:10px">Nessun esercizio</div>':'';
-  el.innerHTML=noteHTML;
-  const exHtml=g.esercizi.map((ex,i)=>{
+  if(!(g.esercizi||[]).length){el.innerHTML=noteHTML+'<div style="color:var(--text3);font-style:italic;padding:10px">Nessun esercizio</div>';return;}
+  const exHtml=(g.esercizi||[]).map((ex,i)=>{
     const libEx=exerciseLibrary.find(e=>e.name===ex.name);
     const stored=weightHist[ex.name];const lastKg=stored?stored.at(-1).kg:'';
     const key=`ex_${idx}_${i}`;const done=ls(key,false);const fb=ls(`fb_${key}`,{emoji:'',text:''});
@@ -2316,11 +2315,35 @@ async function renderSchedeList(){
   } else {
     schedeList=[];
   }
-  document.getElementById('schede-list').innerHTML=schedeList.length?schedeList.map((s,i)=>{
+  if(!schedeList.length){
+    document.getElementById('schede-list').innerHTML='<div style="font-size:13px;color:var(--text3);font-style:italic;padding:10px 0">Nessuna scheda attiva.</div>';
+    return;
+  }
+  // Raggruppa per cliente
+  const byCliente={};
+  schedeList.forEach((s,i)=>{
     const cl=clientiList.find(c=>c.id===s.clienteId);
-    const clienteName=cl?.name||s.clienteId||'—';
-    return `<div style="background:var(--warm);border:1.5px solid var(--border);border-radius:var(--r2);padding:12px 14px;margin-bottom:8px"><div style="font-size:13px;font-weight:600;margin-bottom:2px">${s.nome}</div><div style="font-size:11px;color:var(--text2);margin-bottom:8px">👤 ${clienteName} · ${s.weeks||4} settimane · ${s.start||s.data||'—'}</div><div style="display:flex;gap:6px"><span class="badge badge-green">Attiva</span><button class="btn-danger" style="margin-left:auto" onclick="delScheda('${s.id}',${i})">Elimina</button></div></div>`;
-  }).join(''):'<div style="font-size:13px;color:var(--text3);font-style:italic;padding:10px 0">Nessuna scheda attiva.</div>';
+    const key=s.clienteId||'__nessuno__';
+    if(!byCliente[key])byCliente[key]={name:cl?.name||'Cliente sconosciuta',schede:[]};
+    byCliente[key].schede.push({...s,_i:i});
+  });
+  document.getElementById('schede-list').innerHTML=Object.entries(byCliente).map(([cid,{name,schede}])=>`
+    <details style="border:1.5px solid var(--border);border-radius:var(--r2);margin-bottom:8px;overflow:hidden" open>
+      <summary style="padding:10px 14px;cursor:pointer;background:var(--warm);list-style:none;display:flex;align-items:center;justify-content:space-between;user-select:none">
+        <span style="font-size:13px;font-weight:600">👤 ${name}</span>
+        <span style="font-size:11px;color:var(--text3)">${schede.length} scheda${schede.length>1?'e':''} attiva${schede.length>1?'e':''} ▼</span>
+      </summary>
+      <div style="padding:8px 14px;background:var(--bg2)">
+        ${schede.map(s=>`<div style="background:var(--warm);border:1px solid var(--border);border-radius:var(--r);padding:10px 12px;margin-bottom:6px">
+          <div style="font-size:13px;font-weight:600;margin-bottom:2px">${s.nome}</div>
+          <div style="font-size:11px;color:var(--text2);margin-bottom:8px">${s.weeks||4} settimane · inizio ${s.start||s.data||'—'}</div>
+          <div style="display:flex;gap:6px;align-items:center">
+            <span class="badge badge-green">Attiva</span>
+            <button class="btn-danger" style="margin-left:auto" onclick="delScheda('${s.id}',${s._i})">Elimina</button>
+          </div>
+        </div>`).join('')}
+      </div>
+    </details>`).join('');
 }
 async function delScheda(id,i){
   if(id&&user?.id){
@@ -3408,23 +3431,20 @@ async function setupRealtimeChat(){
   // ── CANALE CLIENTE (schede, piano, promemoria) ──
   if(myRole==='cliente'){
     makeChannel('cliente_'+user.id, ch=>{
-      ch.on('postgres_changes',{event:'INSERT',schema:'public',table:'schede'},payload=>{
+      ch.on('postgres_changes',{event:'*',schema:'public',table:'schede'},payload=>{
+        console.log('[CLIENTE] schede:',payload.eventType,payload.new?.cliente_id,'vs',user.id);
         if(payload.new?.cliente_id!==user.id)return;
         if(page!=='allenamento'){addNotif('allenamento',1);toast('📋 Annalisa ha assegnato una nuova scheda!');}
         else loadUserData().then(()=>renderWorkout());
       });
-      ch.on('postgres_changes',{event:'UPDATE',schema:'public',table:'schede'},payload=>{
+      ch.on('postgres_changes',{event:'*',schema:'public',table:'piani_alimentari'},payload=>{
+        console.log('[CLIENTE] piano:',payload.eventType,payload.new?.cliente_id,'vs',user.id);
         if(payload.new?.cliente_id!==user.id)return;
-        if(page!=='allenamento'){addNotif('allenamento',1);toast('📋 La tua scheda è stata aggiornata!');}
-        else loadUserData().then(()=>renderWorkout());
-      });
-      ch.on('postgres_changes',{event:'INSERT',schema:'public',table:'piani_alimentari'},payload=>{
         if(page!=='piano'){addNotif('piano',1);toast('🥗 Annalisa ha assegnato un piano alimentare!');}
       });
-      ch.on('postgres_changes',{event:'UPDATE',schema:'public',table:'piani_alimentari'},payload=>{
-        if(page!=='piano'){addNotif('piano',1);toast('🥗 Il tuo piano alimentare è stato aggiornato!');}
-      });
-      ch.on('postgres_changes',{event:'INSERT',schema:'public',table:'promemoria'},payload=>{
+      ch.on('postgres_changes',{event:'*',schema:'public',table:'promemoria'},payload=>{
+        console.log('[CLIENTE] promemoria:',payload.new?.cliente_id,'vs',user.id);
+        if(payload.new?.cliente_id!==user.id)return;
         addNotif('home',1);toast('🔔 Nuovo promemoria da Annalisa!');
       });
     });
