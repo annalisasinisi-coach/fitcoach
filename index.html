@@ -534,9 +534,8 @@ input,textarea,select{font-family:'DM Sans',sans-serif}
             </div>
           </div>
         </div>
-        <div class="day-tabs-wrap" id="day-tabs"></div>
-        <div class="coach-note" id="coach-note" style="display:none"><span style="font-size:18px;flex-shrink:0">📝</span><div><div class="cn-text" id="cn-text"></div><div class="cn-author">— Annalisa Sinisi Fit Coach</div></div></div>
-        <div id="ex-container"></div>
+        <div id="day-tabs-accordion"></div>
+        <div id="day-content" style="display:none"></div>
         <button class="btn-primary" style="width:100%;margin-top:14px" onclick="completeSession()">✓ Completa sessione</button>
       </div>
 
@@ -3162,34 +3161,46 @@ async function viewClient(clientId, clientName){
     if(scheda?.length){
       const s=scheda[0];
       const giorniHtml=(s.giorni||[]).map((g,gi)=>{
+        if(g.tipo==='riposo') return `<details style="margin-bottom:5px;border:1px solid var(--border);border-radius:var(--r);overflow:hidden">
+          <summary style="padding:8px 12px;cursor:pointer;background:var(--warm);list-style:none;display:flex;align-items:center;gap:8px;user-select:none">
+            <span style="font-size:11px;font-weight:700;background:var(--peach-pale);color:#C07040;padding:2px 8px;border-radius:10px">${g.label}</span>
+            <span style="font-size:12px;font-weight:600">${g.nome||'Riposo'}</span>
+            <span style="font-size:11px;color:var(--text3)">😴</span>
+          </summary>
+          <div style="padding:8px 12px;background:var(--bg2);font-size:12px;color:var(--text3);font-style:italic">${g.note||'Giornata di recupero'}</div>
+        </details>`;
         const exHtml=(g.esercizi||[]).map((ex,ei)=>`
           <div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border)">
-            <div style="width:22px;height:22px;border-radius:50%;background:var(--rose-pale);color:var(--rose);font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">${ei+1}</div>
+            <div style="width:20px;height:20px;border-radius:50%;background:var(--rose-pale);color:var(--rose);font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">${ei+1}</div>
             <div style="flex:1;min-width:0">
-              <div style="font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${ex.name}</div>
-              <div style="font-size:11px;color:var(--text2)">${ex.sets} × ${ex.reps} · Rec: ${ex.recupero||'—'} · RPE ${ex.rpe||'—'}</div>
-              ${ex.note?`<div style="font-size:10px;color:var(--text3);font-style:italic">${ex.note}</div>`:''}
+              <div style="font-size:12px;font-weight:600">${ex.name}</div>
+              <div style="font-size:11px;color:var(--text2)">${ex.sets}×${ex.reps} · Rec ${ex.recupero||'—'} · RPE ${ex.rpe||'—'}</div>
             </div>
           </div>`).join('');
-        return `<div style="background:var(--warm);border-radius:var(--r);padding:10px 12px;margin-bottom:6px">
-          <div style="display:flex;align-items:center;gap:8px;margin-bottom:${g.tipo==='riposo'?'0':'8px'}">
-            <span style="font-size:11px;font-weight:700;background:${g.tipo==='riposo'?'var(--peach-pale)':'var(--rose-pale)'};color:${g.tipo==='riposo'?'#C07040':'var(--rose)'};padding:2px 8px;border-radius:10px">${g.label}</span>
-            <span style="font-size:12px;font-weight:600">${g.nome||''}</span>
-            ${g.tipo==='riposo'?'<span style="font-size:11px;color:var(--text3)">😴 Riposo</span>':''}
-          </div>
-          ${g.tipo!=='riposo'?exHtml:''}
-          ${g.note&&g.tipo!=='riposo'?`<div style="font-size:11px;color:var(--text2);margin-top:6px;padding-top:6px;border-top:1px solid var(--border)">📝 ${g.note}</div>`:''}
-        </div>`;
+        return `<details style="margin-bottom:5px;border:1px solid var(--border);border-radius:var(--r);overflow:hidden">
+          <summary style="padding:8px 12px;cursor:pointer;background:var(--warm);list-style:none;display:flex;align-items:center;justify-content:space-between;user-select:none">
+            <div style="display:flex;align-items:center;gap:8px">
+              <span style="font-size:11px;font-weight:700;background:var(--rose-pale);color:var(--rose);padding:2px 8px;border-radius:10px">${g.label}</span>
+              <span style="font-size:12px;font-weight:600">${g.nome||''}</span>
+            </div>
+            <span style="font-size:11px;color:var(--text3)">${(g.esercizi||[]).length} es. ▼</span>
+          </summary>
+          <div style="padding:8px 12px;background:var(--bg2)">${exHtml}${g.note?'<div style="font-size:11px;color:var(--text2);margin-top:6px;padding-top:6px;border-top:1px solid var(--border)">📝 '+g.note+'</div>':''}</div>
+        </details>`;
       }).join('');
-      html+=`<div style="background:linear-gradient(135deg,var(--violet-pale),var(--rose-pale));border-radius:var(--r);padding:10px 14px;margin-bottom:8px">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px">
-          <div style="font-weight:600">${s.nome}</div>
-          <button class="btn-ghost" style="font-size:11px;padding:4px 8px" onclick="printSchedaData(window._lastSchedaCoach,'${nome}')">🖨️ PDF</button>
-        </div>
-        <div style="font-size:12px;color:var(--text2);margin-bottom:10px">Sett. ${s.current_week||1}/${s.weeks||4} · ${s.giorni?.length||0} giorni · ${(s.giorni||[]).reduce((tot,g)=>tot+(g.esercizi||[]).length,0)} esercizi totali</div>
-        ${giorniHtml}
-        ${s.note_globali?`<div style="font-size:11px;color:var(--text2);margin-top:8px;padding-top:8px;border-top:1px solid rgba(0,0,0,0.08)">📋 Note: ${s.note_globali}</div>`:''}
-      </div>`;
+      html+=`<details style="margin-bottom:12px;border:1.5px solid rgba(123,63,160,0.2);border-radius:var(--r2);overflow:hidden" open>
+        <summary style="padding:10px 14px;cursor:pointer;background:linear-gradient(135deg,var(--violet-pale),var(--rose-pale));list-style:none;display:flex;align-items:center;justify-content:space-between;user-select:none">
+          <div>
+            <div style="font-weight:600;font-size:13px">${s.nome}</div>
+            <div style="font-size:11px;color:var(--text3)">Sett. ${s.current_week||1}/${s.weeks||4} · ${s.giorni?.length||0} giorni · ${(s.giorni||[]).reduce((tot,g)=>tot+(g.esercizi||[]).length,0)} esercizi</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <button class="btn-ghost" style="font-size:11px;padding:4px 8px" onclick="event.preventDefault();event.stopPropagation();printSchedaData(window._lastSchedaCoach,'${nome}')">🖨️</button>
+            <span style="font-size:12px;color:var(--text3)">▼</span>
+          </div>
+        </summary>
+        <div style="padding:10px 14px;background:var(--bg2)">${giorniHtml}${s.note_globali?'<div style="font-size:11px;color:var(--text2);margin-top:8px;padding:8px;border-radius:var(--r);background:var(--warm)">📋 '+s.note_globali+'</div>':''}</div>
+      </details>`;
     }
     else html+=`<div style="font-size:13px;color:var(--text3);font-style:italic">Nessuna scheda assegnata</div>`;
     html+='</div>';
