@@ -1297,7 +1297,7 @@ async function afterLogin(supaUser) {
   navigate(role==='admin'?'admin-dashboard':'home');
   setupRealtimeChat(); // both coach and client need realtime
   // Reset notification state for fresh session
-  notifState.counts={};sectionLastVisit={};lastPollTime=null;
+  notifState.counts={};sectionLastVisit={};lastPollTime=null;_realtimeInitialized=false;
   startPolling();
 }
 
@@ -1655,6 +1655,7 @@ async function renderDayContentInto(idx, el){
       </div>
     </div>`;
   }).join('');
+  el.innerHTML = noteHTML + exHtml;
 }
 async function toggleEx(key,btn,cid){const d=!ls(key,false);ss(key,d);btn.classList.toggle('done',d);btn.textContent=d?'✓':'';document.getElementById(cid).classList.toggle('completed',d);if(d)toast('✓ Esercizio completato!');}
 async function toggleSeries(key,idx,el){const sd=ls(`s_${key}_${idx}`,{done:false,kg:''});const kg=document.getElementById(`w_${key}`)?.value||'';sd.done=!sd.done;sd.kg=kg;ss(`s_${key}_${idx}`,sd);el.classList.toggle('done',sd.done);el.querySelector('.sp-val').textContent=sd.done&&kg?`✓ ${kg}kg`:el.querySelector('.sp-label').nextSibling?.textContent||'';if(sd.done)startTimer(90);}
@@ -3304,14 +3305,14 @@ async function pollNotifications(){
       }
       // Check for new/updated scheda (created or updated by coach)
       if(page!=='allenamento'){
-        const {data:scheda}=await supa.from('schede').select('id,updated_at').eq('cliente_id',user.id).eq('attiva',true);
-        const newScheda=scheda?.filter(s=>(s.updated_at||'')>since);
+        const {data:scheda}=await supa.from('schede').select('id,created_at').eq('cliente_id',user.id).eq('attiva',true);
+        const newScheda=scheda?.filter(s=>(s.created_at||'')>since);
         if(newScheda?.length)addNotif('allenamento',1);
       }
       // Check for new/updated piano alimentare
       if(page!=='piano'){
-        const {data:piano}=await supa.from('piani_alimentari').select('id,updated_at').eq('cliente_id',user.id);
-        const newPiano=piano?.filter(p=>(p.updated_at||'')>since);
+        const {data:piano}=await supa.from('piani_alimentari').select('id,created_at').eq('cliente_id',user.id);
+        const newPiano=piano?.filter(p=>(p.created_at||'')>since);
         if(newPiano?.length)addNotif('piano',1);
       }
       // Check for new promemoria
@@ -3381,8 +3382,11 @@ async function initApp(){ await checkSession(); }
 initApp();
 
 // Listen for Supabase real-time chat messages
+let _realtimeInitialized=false;
 async function setupRealtimeChat(){
   if(!user?.id)return;
+  if(_realtimeInitialized){console.log('Realtime già inizializzato, skip');return;}
+  _realtimeInitialized=true;
   const myRole=role; // cattura il ruolo al momento della chiamata
 
   function makeChannel(name,setupFn){
