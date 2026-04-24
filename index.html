@@ -2126,7 +2126,21 @@ async function exportToPdf(title,questions,answers){
 async function renderPiano(){
   document.getElementById('macro-overview').innerHTML=`<div class="macro-ring-card"><div class="macro-circle prot">${macros.prot}g</div><div><div class="macro-val">${macros.prot}g</div><div class="macro-label">Proteine</div></div></div><div class="macro-ring-card"><div class="macro-circle carb">${macros.carb}g</div><div><div class="macro-val">${macros.carb}g</div><div class="macro-label">Carboidrati</div></div></div><div class="macro-ring-card"><div class="macro-circle fat">${macros.fat}g</div><div><div class="macro-val">${macros.fat}g</div><div class="macro-label">Grassi</div></div></div><div class="macro-ring-card"><div class="macro-circle kcal">${macros.kcal}</div><div><div class="macro-val">${macros.kcal}</div><div class="macro-label">Kcal/giorno</div></div></div>`;
 
-  document.getElementById('meals-container').innerHTML=adminMeals.map(m=>`<div class="meal-card"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px"><div style="font-size:15px;font-weight:600">${m.nome}</div><div style="font-size:12px;color:var(--text2)">${m.k} kcal</div></div><div style="font-size:13px;color:var(--text2);margin-bottom:10px;line-height:1.6">${m.foods}</div><div style="display:flex;gap:8px"><span class="mm p">🥩 Prot ${m.p}g</span><span class="mm c">🌾 Carb ${m.c}g</span><span class="mm f">🥑 Grassi ${m.f}g</span></div></div>`).join('');
+  document.getElementById('meals-container').innerHTML=adminMeals.map(m=>`
+    <details class="meal-details" style="margin-bottom:8px;border:1.5px solid var(--border);border-radius:var(--r2);overflow:hidden">
+      <summary style="padding:12px 16px;cursor:pointer;background:var(--warm);list-style:none;display:flex;align-items:center;justify-content:space-between;user-select:none">
+        <span style="font-size:14px;font-weight:600">${m.nome}</span>
+        <span style="font-size:12px;color:var(--rose);font-weight:600">${m.k} kcal ▼</span>
+      </summary>
+      <div style="padding:12px 16px;background:var(--bg2)">
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+          <span class="mm p">🥩 Prot ${m.p}g</span>
+          <span class="mm c">🌾 Carb ${m.c}g</span>
+          <span class="mm f">🥑 Grassi ${m.f}g</span>
+        </div>
+        <div style="font-size:13px;color:var(--text2);line-height:1.6">${m.foods}</div>
+      </div>
+    </details>`).join('');
 }
 
 // ══════════════════════════════════
@@ -2569,7 +2583,18 @@ async function renderAdminPiano(){
     }
   }
   const list=document.getElementById('admin-meals-list');
-  if(list)list.innerHTML=adminMeals.length?adminMeals.map((m,i)=>`<div style="background:var(--warm);border:1.5px solid var(--border);border-radius:var(--r);padding:10px 13px;margin-bottom:7px;display:flex;justify-content:space-between;align-items:center"><div><div style="font-size:13px;font-weight:600">${m.nome}</div><div style="font-size:11px;color:var(--text2)">${m.k} kcal · P:${m.p}g C:${m.c}g G:${m.f}g</div>${m.foods?`<div style="font-size:11px;color:var(--text3);margin-top:2px">${m.foods}</div>`:''}</div><button class="btn-danger" onclick="delMeal(${i})">✕</button></div>`).join(''):'<div style="font-size:13px;color:var(--text3);font-style:italic;padding:10px 0">Nessun pasto. Seleziona una cliente e aggiungi pasti.</div>';
+  if(list)list.innerHTML=adminMeals.length?adminMeals.map((m,i)=>`
+    <details style="margin-bottom:6px;border:1.5px solid var(--border);border-radius:var(--r2);overflow:hidden">
+      <summary style="padding:9px 13px;cursor:pointer;background:var(--warm);list-style:none;display:flex;align-items:center;justify-content:space-between;user-select:none">
+        <span style="font-size:13px;font-weight:600">${m.nome}</span>
+        <span style="font-size:11px;color:var(--text3)">${m.k} kcal ▼</span>
+      </summary>
+      <div style="padding:10px 13px;background:var(--bg2)">
+        <div style="font-size:12px;color:var(--text2);margin-bottom:6px">P:${m.p}g · C:${m.c}g · G:${m.f}g</div>
+        ${m.foods?`<div style="font-size:12px;color:var(--text3);margin-bottom:8px">${m.foods}</div>`:''}
+        <button class="btn-danger" style="font-size:11px" onclick="delMeal(${i})">✕ Elimina</button>
+      </div>
+    </details>`).join(''):'<div style="font-size:13px;color:var(--text3);font-style:italic;padding:10px 0">Nessun pasto. Seleziona una cliente e aggiungi pasti.</div>';
 }
 async function delMeal(i){
   const cId=document.getElementById('ap-cliente')?.value;
@@ -2608,10 +2633,29 @@ async function renderReminders(){
     const {data:profs}=await supa.from('profiles').select('id,nome,cognome,email').in('id',clientIds);
     (profs||[]).forEach(p=>{nameMap[p.id]=((p.nome||'')+(p.cognome?' '+p.cognome:'')).trim()||p.email||'Cliente';});
   }
-  el.innerHTML=promDB.map(r=>{
+  // Raggruppa per cliente
+  const byC={};
+  promDB.forEach(r=>{
     const cn=nameMap[r.cliente_id]||'Cliente';
-    return `<div class="reminder-item"><div class="reminder-icon" style="font-size:22px;flex-shrink:0">🔔</div><div style="flex:1"><div class="reminder-date">${cn} — ${new Date(r.data_promemoria).toLocaleDateString('it-IT',{day:'numeric',month:'long',year:'numeric'})}</div><div class="reminder-who">${r.messaggio||''}</div></div><button class="btn-danger" onclick="delReminderDB('${r.id}')">✕</button></div>`;
-  }).join('');
+    if(!byC[cn])byC[cn]=[];
+    byC[cn].push(r);
+  });
+  el.innerHTML=Object.entries(byC).map(([cn,items])=>`
+    <details style="margin-bottom:8px;border:1.5px solid var(--border);border-radius:var(--r2);overflow:hidden" open>
+      <summary style="padding:10px 14px;cursor:pointer;background:var(--warm);list-style:none;display:flex;justify-content:space-between;align-items:center;user-select:none">
+        <span style="font-size:13px;font-weight:600">🔔 ${cn}</span>
+        <span style="font-size:11px;color:var(--text3)">${items.length} promemoria ▼</span>
+      </summary>
+      <div style="padding:8px 14px;background:var(--bg2)">
+        ${items.map(r=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--border)">
+          <div>
+            <div style="font-size:12px;font-weight:600">${new Date(r.data_promemoria).toLocaleDateString('it-IT',{day:'numeric',month:'long',year:'numeric'})}</div>
+            ${r.messaggio?`<div style="font-size:11px;color:var(--text3)">${r.messaggio}</div>`:''}
+          </div>
+          <button class="btn-danger" style="font-size:11px;padding:3px 8px" onclick="delReminderDB('${r.id}')">✕</button>
+        </div>`).join('')}
+      </div>
+    </details>`).join('');
 }
 async function delReminderDB(id){
   if(!id)return;
@@ -2646,21 +2690,36 @@ async function renderAdminCi(){
   if(selectedId) q=q.eq('cliente_id',selectedId);
   const {data:ciData}=await q;
   if(!ciData?.length){el.innerHTML='<div class="card" style="text-align:center;padding:40px;color:var(--text2)">Nessun check-in ricevuto</div>';return;}
-  el.innerHTML=ciData.map(c=>{
+  // Raggruppa per cliente
+  const ciByC={};
+  ciData.forEach(c=>{
     const p=c.profiles;
-    const clientName=p?((p.nome||'')+(p.cognome?' '+p.cognome:'')).trim()||p.email:'Cliente';
-    const date=new Date(c.data_checkin).toLocaleDateString('it-IT',{day:'numeric',month:'long',year:'numeric'});
-    return `<div class="card" style="margin-bottom:10px">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-        <div><div style="font-size:14px;font-weight:600">${clientName}</div><div style="font-size:12px;color:var(--text2)">${date}</div></div>
-        <span class="badge badge-green">Ricevuto</span>
+    const cn=p?((p.nome||'')+(p.cognome?' '+p.cognome:'')).trim()||p.email:'Cliente';
+    if(!ciByC[cn])ciByC[cn]=[];
+    ciByC[cn].push(c);
+  });
+  el.innerHTML=Object.entries(ciByC).map(([cn,items])=>`
+    <details style="margin-bottom:8px;border:1.5px solid var(--border);border-radius:var(--r2);overflow:hidden" open>
+      <summary style="padding:10px 14px;cursor:pointer;background:var(--warm);list-style:none;display:flex;justify-content:space-between;align-items:center;user-select:none">
+        <span style="font-size:13px;font-weight:600">👤 ${cn}</span>
+        <span style="font-size:11px;color:var(--text3)">${items.length} check-in ▼</span>
+      </summary>
+      <div style="padding:8px 14px;background:var(--bg2)">
+        ${items.map(c=>{
+          const date=new Date(c.data_checkin).toLocaleDateString('it-IT',{day:'numeric',month:'long',year:'numeric'});
+          const misure=[['⚖️',c.peso,'kg'],['Spalle',c.spalle,'cm'],['Vita',c.vita,'cm'],['Fianchi',c.fianchi,'cm'],['Glutei',c.glutei,'cm'],['Coscia',c.coscia_sx,'cm']].filter(x=>x[1]);
+          return `<details style="margin-bottom:5px;border:1px solid var(--border);border-radius:var(--r);overflow:hidden">
+            <summary style="padding:7px 12px;cursor:pointer;background:var(--bg2);list-style:none;display:flex;justify-content:space-between;align-items:center;user-select:none">
+              <span style="font-size:12px;font-weight:600">${date}</span>
+              ${c.peso?`<span style="font-size:12px;color:var(--rose)">⚖️ ${c.peso}kg</span>`:''}
+            </summary>
+            <div style="padding:8px 12px;display:flex;gap:10px;flex-wrap:wrap;background:var(--warm)">
+              ${misure.map(x=>`<div style="font-size:12px;background:var(--bg2);padding:3px 9px;border-radius:20px">${x[0]} <strong>${x[1]}${x[2]}</strong></div>`).join('')}
+            </div>
+          </details>`;
+        }).join('')}
       </div>
-      <div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:10px">
-        ${[['⚖️',c.peso,'kg'],['Spalle',c.spalle,'cm'],['Vita',c.vita,'cm'],['Fianchi',c.fianchi,'cm'],['Glutei',c.glutei,'cm'],['Coscia',c.coscia_sx,'cm']].filter(x=>x[1]).map(x=>`<div style="font-size:13px">${x[0]} <strong>${x[1]}${x[2]}</strong></div>`).join('')}
-      </div>
-
-    </div>`;
-  }).join('');
+    </details>`).join('');
 }
 async function sendCiFeedback(ciId){
   const inp=document.getElementById('fb-'+ciId);
@@ -2790,15 +2849,15 @@ async function renderAdminFeedback(){
   if(!_feedbackClienteId||!clientiMap[_feedbackClienteId]) _feedbackClienteId=Object.keys(clientiMap)[0]||'';
   const opts=Object.entries(clientiMap).map(([id,name])=>`<option value="${id}" ${id===_feedbackClienteId?'selected':''}>${name}</option>`).join('');
   const filtered=fbs.filter(f=>f.cliente_id===_feedbackClienteId);
-  const cards=filtered.length?filtered.map(f=>{
+  const cards=filtered.length?filtered.map((f,fi)=>{
     const date=new Date(f.created_at).toLocaleDateString('it-IT',{day:'numeric',month:'short'});
-    return `<div class="card" style="margin-bottom:8px">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px">
-        <div style="font-size:13px;font-weight:600">${f.esercizio_key} ${f.emoji||''}</div>
-        <div style="font-size:11px;color:var(--text3)">${date}</div>
-      </div>
-      ${f.testo?`<div style="font-size:13px;background:var(--warm);border-radius:var(--r);padding:7px 11px;">"${f.testo}"</div>`:'<div style="font-size:12px;color:var(--text3);font-style:italic">Solo emoji, nessun testo</div>'}
-    </div>`;
+    return `<details style="margin-bottom:5px;border:1px solid var(--border);border-radius:var(--r2);overflow:hidden">
+      <summary style="padding:8px 12px;cursor:pointer;background:var(--warm);list-style:none;display:flex;align-items:center;justify-content:space-between;user-select:none">
+        <span style="font-size:13px;font-weight:600">${f.esercizio_key} ${f.emoji||''}</span>
+        <span style="font-size:11px;color:var(--text3)">${date} ▼</span>
+      </summary>
+      <div style="padding:8px 12px;background:var(--bg2);font-size:13px">${f.testo?'"'+f.testo+'"':'<em style="color:var(--text3)">Solo emoji</em>'}</div>
+    </details>`;
   }).join(''):`<div style="font-size:13px;color:var(--text3);padding:20px;text-align:center">Nessun feedback da questa cliente</div>`;
   el.innerHTML=`<div style="margin-bottom:12px">
     <select onchange="_feedbackClienteId=this.value;renderAdminFeedback()" style="width:100%;padding:9px 14px;border:1.5px solid var(--border);border-radius:var(--r2);background:var(--bg2);color:var(--text);font-size:13px;font-family:inherit">
@@ -3017,15 +3076,22 @@ async function renderAdminRisorse(){
   if(error){el.innerHTML='<div style="color:var(--rose);font-size:13px">Errore caricamento — assicurati di aver creato la tabella risorse</div>';return;}
   if(!data?.length){el.innerHTML='<div style="font-size:13px;color:var(--text3);font-style:italic">Nessuna risorsa ancora.</div>';return;}
   el.innerHTML=data.map(r=>`
-    <div style="background:var(--warm);border:1.5px solid var(--border);border-radius:var(--r);padding:10px 13px;margin-bottom:7px;display:flex;align-items:center;gap:10px">
-      <span style="font-size:20px">${r.emoji||'📄'}</span>
-      <div style="flex:1;min-width:0">
-        <div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${r.titolo}</div>
-        ${r.descrizione?`<div style="font-size:11px;color:var(--text2)">${r.descrizione}</div>`:''}
-        <div style="font-size:11px;color:var(--text3);margin-top:2px">${r.tipo==='pdf_url'?'PDF':'Link'} · <a href="${r.url}" target="_blank" style="color:var(--rose)">Apri ↗</a></div>
+    <details style="margin-bottom:6px;border:1.5px solid var(--border);border-radius:var(--r2);overflow:hidden">
+      <summary style="padding:10px 14px;cursor:pointer;background:var(--warm);list-style:none;display:flex;align-items:center;justify-content:space-between;user-select:none">
+        <div style="display:flex;align-items:center;gap:8px;min-width:0">
+          <span style="font-size:18px;flex-shrink:0">${r.emoji||'📄'}</span>
+          <span style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${r.titolo}</span>
+        </div>
+        <span style="font-size:11px;color:var(--text3);flex-shrink:0;margin-left:8px">${r.tipo==='pdf_url'?'PDF':'Link'} ▼</span>
+      </summary>
+      <div style="padding:10px 14px;background:var(--bg2)">
+        ${r.descrizione?`<div style="font-size:12px;color:var(--text2);margin-bottom:8px">${r.descrizione}</div>`:''}
+        <div style="display:flex;gap:8px;align-items:center">
+          <a href="${r.url}" target="_blank" class="btn-sm" style="text-decoration:none">Apri ↗</a>
+          <button class="btn-danger" onclick="event.preventDefault();delRisorsa('${r.id}')">✕ Elimina</button>
+        </div>
       </div>
-      <button class="btn-danger" onclick="delRisorsa('${r.id}')">✕</button>
-    </div>`).join('');
+    </details>`).join('');
 }
 
 async function delRisorsa(id){
@@ -3260,11 +3326,23 @@ async function viewClient(clientId, clientName){
         <span>💬 FEEDBACK ALLENAMENTO (${feedbacks?.length||0})</span><span style="font-size:12px">▼</span>
       </summary>
       <div style="padding:10px 14px;background:var(--bg2)">`;
-    if(feedbacks?.length){html+=feedbacks.map(f=>`<div style="background:var(--warm);border-radius:var(--r);padding:7px 12px;margin-bottom:4px;font-size:12px;display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap">
-      <span><strong>${f.esercizio_key}</strong> ${f.emoji||''} ${f.testo?`— "${f.testo}"`:''}  </span>
-      <span style="color:var(--text3);white-space:nowrap">${new Date(f.created_at).toLocaleDateString('it-IT')}</span>
-    </div>`).join('');}
-    else html+=`<div style="font-size:13px;color:var(--text3);font-style:italic;padding:8px 0">Nessun feedback</div>`;
+    if(feedbacks?.length){
+      const fbByEx={};
+      feedbacks.forEach(f=>{if(!fbByEx[f.esercizio_key])fbByEx[f.esercizio_key]=[];fbByEx[f.esercizio_key].push(f);});
+      html+=Object.entries(fbByEx).map(([ex,items])=>`
+        <details style="margin-bottom:5px;border:1px solid var(--border);border-radius:var(--r);overflow:hidden">
+          <summary style="padding:7px 11px;cursor:pointer;background:var(--warm);list-style:none;display:flex;justify-content:space-between;align-items:center;user-select:none">
+            <span style="font-size:12px;font-weight:600">${ex}</span>
+            <span style="font-size:11px;color:var(--text3)">${items.length} feedback ▼</span>
+          </summary>
+          <div style="padding:6px 11px;background:var(--bg2)">
+            ${items.map(f=>`<div style="font-size:12px;padding:4px 0;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;gap:8px">
+              <span>${f.emoji||''} ${f.testo?'"'+f.testo+'"':'<em style="color:var(--text3)">Solo emoji</em>'}</span>
+              <span style="color:var(--text3);white-space:nowrap">${new Date(f.created_at).toLocaleDateString('it-IT')}</span>
+            </div>`).join('')}
+          </div>
+        </details>`).join('');
+    } else html+=`<div style="font-size:13px;color:var(--text3);font-style:italic;padding:8px 0">Nessun feedback</div>`;
     html+='</div></details>';
     mc.innerHTML=html;
   }catch(e){mc.innerHTML=`<div style="color:red;padding:20px">Errore: ${e.message}</div>`;}
