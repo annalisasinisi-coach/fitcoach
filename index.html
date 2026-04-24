@@ -840,7 +840,7 @@ input,textarea,select{font-family:'DM Sans',sans-serif}
           </div>
           <div>
 
-            <div class="card"><div class="card-title">Pasti salvati</div><div id="admin-meals-list" style="margin-top:8px"></div></div>
+            <div class="card" style="min-width:0"><div class="card-title">Pasti salvati</div><div id="admin-meals-list" style="margin-top:8px"></div></div>
           </div>
         </div>
       </div>
@@ -2589,8 +2589,11 @@ async function renderAdminPiano(){
   const cName2=document.getElementById('ap-cliente')?.options[document.getElementById('ap-cliente')?.selectedIndex]?.text||'Cliente';
   list.innerHTML=`<details style="border:1.5px solid var(--border);border-radius:var(--r2);overflow:hidden" open>
     <summary style="padding:10px 14px;cursor:pointer;background:var(--warm);list-style:none;display:flex;justify-content:space-between;align-items:center;user-select:none">
-      <span style="font-size:13px;font-weight:600">👤 ${cName2}</span>
-      <span style="font-size:11px;color:var(--text3)">${adminMeals.length} pasti ▼</span>
+      <div>
+        <span style="font-size:13px;font-weight:700">👤 ${cName2}</span>
+        <span style="font-size:11px;color:var(--text3);margin-left:8px">${adminMeals.length} pasto${adminMeals.length!==1?'i':''}</span>
+      </div>
+      <span style="font-size:12px;color:var(--text3)">▼</span>
     </summary>
     <div style="padding:8px 14px;background:var(--bg2)">
       ${adminMeals.map((m,i)=>`
@@ -3317,30 +3320,40 @@ async function viewClient(clientId, clientName){
     else html+=`<div style="font-size:13px;color:var(--text3);font-style:italic;padding:8px 0">Nessun check-in</div>`;
     html+='</div></details>';
     // Piano alimentare (already loaded in Promise.all above)
-    html+=`<div style="margin-bottom:18px"><div style="font-size:11px;text-transform:uppercase;letter-spacing:0.06em;color:var(--text3);font-weight:600;margin-bottom:8px">🥗 PIANO ALIMENTARE</div>`;
-    const pianoRow=piano?.[0];
-    if(pianoRow){
-      html+=`<div style="background:var(--warm);border-radius:var(--r);padding:10px 14px">
-        <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:8px">
-          ${pianoRow.prot_g?`<span style="font-size:13px">🥩 <strong>${pianoRow.prot_g}g</strong> prot</span>`:''}
-          ${pianoRow.carb_g?`<span style="font-size:13px">🌾 <strong>${pianoRow.carb_g}g</strong> carb</span>`:''}
-          ${pianoRow.fat_g?`<span style="font-size:13px">🥑 <strong>${pianoRow.fat_g}g</strong> grassi</span>`:''}
-          ${pianoRow.kcal?`<span style="font-size:13px">🔥 <strong>${pianoRow.kcal}</strong> kcal</span>`:''}
-        </div>
-        ${pianoRow.pasti?.length?pianoRow.pasti.map(m=>`
-          <details style="margin-bottom:4px;border:1px solid var(--border);border-radius:var(--r);overflow:hidden">
-            <summary style="padding:6px 10px;cursor:pointer;background:var(--warm);list-style:none;display:flex;justify-content:space-between;align-items:center;user-select:none">
-              <span style="font-size:12px;font-weight:600">${m.nome}</span>
-              <span style="font-size:11px;color:var(--rose)">${m.k||0} kcal ▼</span>
-            </summary>
-            <div style="padding:6px 10px;background:var(--bg2);font-size:12px">
-              <div style="color:var(--text2);margin-bottom:4px">P:${m.p||0}g · C:${m.c||0}g · G:${m.f||0}g</div>
-              ${m.foods?`<div style="color:var(--text3)">${m.foods}</div>`:''}
-            </div>
-          </details>`).join(''):''}
-      </div>`;
-    } else html+=`<div style="font-size:13px;color:var(--text3);font-style:italic">Nessun piano alimentare assegnato</div>`;
-    html+='</div>';
+    {
+      const pianoRow=piano?.[0];
+      html+=`<details style="margin-bottom:16px;border:1.5px solid var(--border);border-radius:var(--r2);overflow:hidden">
+        <summary style="padding:10px 14px;cursor:pointer;background:var(--warm);font-size:11px;text-transform:uppercase;letter-spacing:0.06em;color:var(--text3);font-weight:600;list-style:none;display:flex;justify-content:space-between;align-items:center;user-select:none">
+          <span>🥗 PIANO ALIMENTARE${pianoRow?' ('+( pianoRow.pasti?.length||0)+' pasti)':''}</span><span style="font-size:12px">▼</span>
+        </summary>
+        <div style="padding:10px 14px;background:var(--bg2)">`;
+      if(pianoRow){
+        html+=`<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:10px;padding:8px 12px;background:var(--warm);border-radius:var(--r)">
+          ${pianoRow.prot_g?`<span style="font-size:12px">🥩 <strong>${pianoRow.prot_g}g</strong> prot</span>`:''}
+          ${pianoRow.carb_g?`<span style="font-size:12px">🌾 <strong>${pianoRow.carb_g}g</strong> carb</span>`:''}
+          ${pianoRow.fat_g?`<span style="font-size:12px">🥑 <strong>${pianoRow.fat_g}g</strong> grassi</span>`:''}
+          ${pianoRow.kcal?`<span style="font-size:12px">🔥 <strong>${pianoRow.kcal}</strong> kcal</span>`:''}
+        </div>`;
+        if(pianoRow.pasti?.length){
+          html+=pianoRow.pasti.map(m=>`
+            <details style="margin-bottom:5px;border:1px solid var(--border);border-radius:var(--r);overflow:hidden">
+              <summary style="padding:8px 12px;cursor:pointer;background:var(--warm);list-style:none;display:flex;justify-content:space-between;align-items:center;user-select:none">
+                <span style="font-size:13px;font-weight:600">${m.nome}</span>
+                <span style="font-size:11px;color:var(--rose)">${m.k||0} kcal ▼</span>
+              </summary>
+              <div style="padding:8px 12px;background:var(--bg2);font-size:12px">
+                <div style="color:var(--text2);margin-bottom:4px">P:${m.p||0}g · C:${m.c||0}g · G:${m.f||0}g</div>
+                ${m.foods?`<div style="color:var(--text3)">${m.foods}</div>`:''}
+              </div>
+            </details>`).join('');
+        } else {
+          html+=`<div style="font-size:13px;color:var(--text3);font-style:italic">Nessun pasto assegnato</div>`;
+        }
+      } else {
+        html+=`<div style="font-size:13px;color:var(--text3);font-style:italic">Nessun piano alimentare assegnato</div>`;
+      }
+      html+='</div></details>';
+    }
     // Pesi — raggruppati per esercizio, collapsibili
     const byExAll={};pesi?.forEach(p=>{if(!byExAll[p.esercizio_nome])byExAll[p.esercizio_nome]=[];byExAll[p.esercizio_nome].push({kg:p.kg,data:p.data_registrazione});});
     html+=`<details style="margin-bottom:16px;border:1.5px solid var(--border);border-radius:var(--r2);overflow:hidden">
@@ -3484,7 +3497,7 @@ function startPolling(){
   const fiveMinAgo=new Date(Date.now()-5*60*1000).toISOString();
   lastPollTime=saved&&saved>fiveMinAgo?saved:fiveMinAgo;
   pollNotifications(); // run immediately
-  _pollInterval=setInterval(pollNotifications,30000); // then every 30s
+  _pollInterval=setInterval(pollNotifications,20000); // then every 20s
 }
 
 // ── INIT ──
@@ -3570,10 +3583,15 @@ async function setupRealtimeChat(){
         if(page!=='allenamento'){addNotif('allenamento',1);toast('📋 Annalisa ha assegnato una nuova scheda!');}
         else loadUserData().then(()=>renderWorkout());
       });
-      ch.on('postgres_changes',{event:'*',schema:'public',table:'piani_alimentari'},payload=>{
-        console.log('[CLIENTE] piano:',payload.eventType,payload.new?.cliente_id,'vs',user.id);
+      ch.on('postgres_changes',{event:'INSERT',schema:'public',table:'piani_alimentari'},payload=>{
+        console.log('[CLIENTE] piano INSERT:',payload.new?.cliente_id,'vs',user.id);
         if(payload.new?.cliente_id!==user.id)return;
         if(page!=='piano'){addNotif('piano',1);toast('🥗 Annalisa ha assegnato un piano alimentare!');}
+      });
+      ch.on('postgres_changes',{event:'UPDATE',schema:'public',table:'piani_alimentari'},payload=>{
+        console.log('[CLIENTE] piano UPDATE:',payload.new?.cliente_id,'vs',user.id);
+        if(payload.new?.cliente_id!==user.id)return;
+        if(page!=='piano'){addNotif('piano',1);toast('🥗 Il tuo piano alimentare è stato aggiornato!');}
       });
       ch.on('postgres_changes',{event:'*',schema:'public',table:'promemoria'},payload=>{
         console.log('[CLIENTE] promemoria:',payload.new?.cliente_id,'vs',user.id);
