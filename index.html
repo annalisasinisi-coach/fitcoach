@@ -570,11 +570,16 @@ input,textarea,select{font-family:'DM Sans',sans-serif}
         <div class="card"><div class="card-title">📈 Progressione pesi</div><div style="margin:10px 0 6px"><select id="ex-sel" onchange="selExDropdown(this.value)" style="width:100%;padding:8px 12px;border:1.5px solid var(--border);border-radius:var(--r2);background:var(--bg2);color:var(--text);font-size:13px;font-family:inherit"><option value="">Seleziona esercizio…</option></select></div><div class="chart-wrap"><canvas id="wChart"></canvas></div></div>
         <!-- Storico completo esercizio -->
         <div class="card" style="margin-top:14px" id="ex-history-card">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-            <div class="card-title" style="margin:0">📋 Storico sessioni</div>
-            <span style="font-size:11px;color:var(--text3)" id="ex-history-subtitle"></span>
-          </div>
-          <div id="ex-history-list" style="max-height:220px;overflow-y:auto"></div>
+          <details>
+            <summary style="list-style:none;cursor:pointer;display:flex;align-items:center;justify-content:space-between;user-select:none">
+              <div class="card-title" style="margin:0">📋 Storico sessioni</div>
+              <div style="display:flex;align-items:center;gap:8px">
+                <span style="font-size:11px;color:var(--text3)" id="ex-history-subtitle"></span>
+                <span style="font-size:12px;color:var(--text3)">▼</span>
+              </div>
+            </summary>
+            <div id="ex-history-list" style="max-height:260px;overflow-y:auto;margin-top:10px"></div>
+          </details>
         </div>
         <!-- Grafico corpo: peso + misure insieme -->
         <div class="card" style="margin-top:14px">
@@ -1583,18 +1588,42 @@ async function renderWorkout(){
   const metaText=sd&&!isNaN(sd)?`Settimana ${currentMeso.currentWeek} di ${currentMeso.weeks} · ${sd.toLocaleDateString('it-IT',{day:'numeric',month:'short'})} — ${ed.toLocaleDateString('it-IT',{day:'numeric',month:'short',year:'numeric'})}`:`Settimana ${currentMeso.currentWeek} di ${currentMeso.weeks}`;
   document.getElementById('meso-disp-meta').textContent=metaText;
   document.getElementById('meso-weeks').innerHTML=Array.from({length:currentMeso.weeks},(_,i)=>{const w=i+1;const cls=w<currentMeso.currentWeek?'done':w===currentMeso.currentWeek?'current':'';return `<div class="meso-week ${cls}">${w}</div>`;}).join('');
-  document.getElementById('day-tabs').innerHTML=currentMeso.giorni.map((g,i)=>`<button class="day-tab ${i===currentDay?'active':''} ${g.tipo==='riposo'?'rest':''}" onclick="switchDay(${i},this)">${g.label}<br><span style="font-size:9px;opacity:0.7">${g.nome}</span></button>`).join('');
-  renderDayContent(currentDay);
+  // Build accordion — each giorno is a <details>
+  const acc=document.getElementById('day-tabs-accordion');
+  if(acc){
+    acc.innerHTML=currentMeso.giorni.map((g,i)=>{
+      const isRest=g.tipo==='riposo';
+      const exCount=g.esercizi?.length||0;
+      return `<details class="workout-day-details" id="day-det-${i}" style="border:1.5px solid var(--border);border-radius:var(--r2);margin-bottom:8px;overflow:hidden" ${i===0?'open':''}>
+        <summary style="padding:12px 16px;cursor:pointer;background:${isRest?'var(--warm)':'linear-gradient(135deg,var(--violet-pale),var(--rose-pale))'};list-style:none;display:flex;align-items:center;justify-content:space-between;user-select:none">
+          <div>
+            <span style="font-size:13px;font-weight:600;color:var(--text)">${g.label}${g.nome?' — '+g.nome:''}</span>
+            ${isRest?'<span style="margin-left:8px;font-size:12px">😴</span>':`<span style="font-size:11px;color:var(--text3);margin-left:8px">${exCount} esercizi</span>`}
+          </div>
+          <span style="font-size:12px;color:var(--text3)">▼</span>
+        </summary>
+        <div class="day-accordion-content" id="day-acc-${i}" style="padding:12px"></div>
+      </details>`;
+    }).join('');
+    // Render content for each day
+    currentMeso.giorni.forEach((_,i)=>renderDayContentInto(i, document.getElementById('day-acc-'+i)));
+  }
 }
 async function switchDay(idx,btn){currentDay=idx;document.querySelectorAll('.day-tab').forEach(b=>b.classList.remove('active'));btn.classList.add('active');renderDayContent(idx);}
 async function renderDayContent(idx){
+  const el=document.getElementById('day-acc-'+idx);
+  if(el) renderDayContentInto(idx,el);
+}
+async function renderDayContentInto(idx, el){
+  if(!el) return;
   const g=currentMeso.giorni[idx];
-  const noteEl=document.getElementById('coach-note');
-  if(g.note){document.getElementById('cn-text').textContent=g.note;noteEl.style.display='flex';}else noteEl.style.display='none';
+  const noteHTML=g.note?`<div class="ex-note-inline" style="margin-bottom:10px">📌 ${g.note}</div>`:'';
   if(g.tipo==='riposo'){
-    document.getElementById('ex-container').innerHTML=`<div class="rest-card"><div style="font-size:48px;margin-bottom:12px">😴</div><div style="font-size:20px;font-family:'Playfair Display',serif;color:var(--text);margin-bottom:8px">${g.nome}</div><div style="font-size:13px;color:var(--text2);max-width:320px;margin:0 auto;line-height:1.7">${g.note||'Giornata di recupero.'}</div></div>`;return;
+    el.innerHTML=noteHTML+`<div class="rest-card"><div style="font-size:48px;margin-bottom:12px">😴</div><div style="font-size:20px;font-family:'Playfair Display',serif;color:var(--text);margin-bottom:8px">${g.nome}</div><div style="font-size:13px;color:var(--text2);max-width:320px;margin:0 auto;line-height:1.7">${g.note||'Giornata di recupero.'}</div></div>`;return;
   }
-  document.getElementById('ex-container').innerHTML=g.esercizi.map((ex,i)=>{
+  el.innerHTML=noteHTML+(g.esercizi||[]).length===0?'<div style="color:var(--text3);font-style:italic;padding:10px">Nessun esercizio</div>':'';
+  el.innerHTML=noteHTML;
+  const exHtml=g.esercizi.map((ex,i)=>{
     const libEx=exerciseLibrary.find(e=>e.name===ex.name);
     const stored=weightHist[ex.name];const lastKg=stored?stored.at(-1).kg:'';
     const key=`ex_${idx}_${i}`;const done=ls(key,false);const fb=ls(`fb_${key}`,{emoji:'',text:''});
@@ -1780,14 +1809,43 @@ async function renderCharts(){
   drawWChart();
   drawBodyChart();
 }
+function aggregateBodyData(data, misura){
+  const from=_periodFrom||new Date(2020,0,1);
+  const to=_periodTo||new Date();
+  const diffMonths=(to-from)/(1000*60*60*24*30);
+  // Misure corporee sono mensili — aggregazione solo se > 12 mesi
+  if(diffMonths<=12){
+    return data.map(d=>({label:fmtDate(d.date),val:d[misura]||d[misura+'_sx']||0})).filter(d=>d.val);
+  } else {
+    // Media mensile
+    const months={};
+    data.forEach(d=>{
+      const dt=parseRawDate(d.date);if(!dt)return;
+      const v=d[misura]||d[misura+'_sx']||0;if(!v)return;
+      const key=dt.getFullYear()+'-'+(dt.getMonth()+1).toString().padStart(2,'0');
+      if(!months[key])months[key]={sum:0,count:0,dt:new Date(dt.getFullYear(),dt.getMonth(),1)};
+      months[key].sum+=v;months[key].count++;
+    });
+    return Object.values(months).sort((a,b)=>a.dt-b.dt).map(m=>({
+      label:m.dt.toLocaleDateString('it-IT',{month:'short',year:'numeric'}),
+      val:Math.round(m.sum/m.count*10)/10
+    }));
+  }
+}
 function drawBodyChart(){
   const misura=(document.getElementById('misura-sel')?.value)||'peso';
   const labelMap={peso:'⚖️ Peso (kg)',vita:'Vita (cm)',fianchi:'Fianchi (cm)',spalle:'Spalle (cm)',glutei:'Glutei (cm)',coscia:'Coscia (cm)'};
   const filtered=filterByPeriod([...checkins].map(c=>({...c,date:c.date})),'date');
-  const labels=filtered.map(c=>fmtDate(c.date));
-  const vals=filtered.map(c=>c[misura]||c[misura+'_sx']||0);
+  const aggregated=aggregateBodyData(filtered,misura);
+  const from=_periodFrom||new Date(2020,0,1);
+  const to=_periodTo||new Date();
+  const diffMonths=(to-from)/(1000*60*60*24*30);
+  const aggLabel=diffMonths<=12?'':' — media mensile';
   if(bwC)bwC.destroy();
-  bwC=new Chart(document.getElementById('bwChart'),{type:'line',data:{labels,datasets:[{label:labelMap[misura]||misura,data:vals,borderColor:'#E8527A',backgroundColor:'rgba(232,82,122,0.07)',tension:0.4,pointBackgroundColor:'#E8527A',pointRadius:5,fill:true}]},options:CC});
+  bwC=new Chart(document.getElementById('bwChart'),{type:'line',data:{
+    labels:aggregated.map(d=>d.label),
+    datasets:[{label:(labelMap[misura]||misura)+aggLabel,data:aggregated.map(d=>d.val),borderColor:'#E8527A',backgroundColor:'rgba(232,82,122,0.07)',tension:0.4,pointBackgroundColor:'#E8527A',pointRadius:aggregated.length>20?3:5,fill:true}]
+  },options:CC});
 }
 async function selExDropdown(n){curEx=n;drawWChart();}
 async function selEx(n,btn){curEx=n;drawWChart();}
@@ -2322,14 +2380,22 @@ async function renderTemplatesList(){
     .order('created_at',{ascending:false});
   if(!data?.length){el.innerHTML='<div style="font-size:13px;color:var(--text3);font-style:italic">Nessun template salvato.</div>';return;}
   el.innerHTML=data.map(t=>`
-    <div style="background:linear-gradient(135deg,var(--violet-pale),var(--rose-pale));border:1.5px solid rgba(123,63,160,0.18);border-radius:var(--r);padding:10px 13px;margin-bottom:7px">
-      <div style="font-size:13px;font-weight:600;margin-bottom:2px">📁 ${t.nome}</div>
-      <div style="font-size:11px;color:var(--text2);margin-bottom:8px">${t.weeks||4} settimane · ${(t.giorni||[]).length} giorni</div>
-      <div style="display:flex;gap:6px">
-        <button class="btn-sm" style="flex:1" onclick="loadTemplate('${t.id}')">Carica nel builder →</button>
-        <button class="btn-danger" onclick="delTemplate('${t.id}')">✕</button>
+    <details style="border:1.5px solid rgba(123,63,160,0.2);border-radius:var(--r2);margin-bottom:7px;overflow:hidden">
+      <summary style="padding:10px 14px;cursor:pointer;background:linear-gradient(135deg,var(--violet-pale),var(--rose-pale));list-style:none;display:flex;align-items:center;justify-content:space-between;user-select:none">
+        <div>
+          <span style="font-size:13px;font-weight:600">📁 ${t.nome}</span>
+          <span style="font-size:11px;color:var(--text3);margin-left:8px">${t.weeks||4} sett. · ${(t.giorni||[]).length} giorni</span>
+        </div>
+        <span style="font-size:12px;color:var(--text3)">▼</span>
+      </summary>
+      <div style="padding:10px 14px;background:var(--bg2)">
+        <div style="font-size:12px;color:var(--text3);margin-bottom:8px">Giorni: ${(t.giorni||[]).map(g=>g.label+(g.nome?' '+g.nome:'')).join(', ')}</div>
+        <div style="display:flex;gap:6px">
+          <button class="btn-sm" style="flex:1" onclick="loadTemplate('${t.id}')">Carica nel builder →</button>
+          <button class="btn-danger" onclick="delTemplate('${t.id}')">✕</button>
+        </div>
       </div>
-    </div>`).join('');
+    </details>`).join('');
 }
 async function loadTemplate(id){
   const {data}=await supa.from('schede').select('*').eq('id',id).maybeSingle();
