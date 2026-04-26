@@ -1345,9 +1345,18 @@ async function loadUserData(){
       const {data:schedaData}=await supa.from('schede').select('*').eq('cliente_id',user.id).eq('attiva',true).order('created_at',{ascending:false}).limit(1);
       if(schedaData?.length){
         const s=schedaData[0];
+        // Se la scheda è cambiata (id diverso), azzera il giorno cached
+        const cachedSchedaId=localStorage.getItem('asfc4_scheda_id_'+(user?.id||''));
+        if(cachedSchedaId && cachedSchedaId!==s.id){
+          localStorage.removeItem('asfc4_nextDay_'+(user?.id||''));
+          console.log('[SCHEDA] Nuova scheda rilevata, reset giorno cache');
+        }
+        localStorage.setItem('asfc4_scheda_id_'+(user?.id||''), s.id);
         currentMeso={nome:s.nome,weeks:s.weeks||4,currentWeek:s.current_week||1,startDate:s.start_date||'',noteGlobali:s.note_globali||'',giorni:s.giorni||[]};
       } else {
         currentMeso={nome:'',weeks:4,currentWeek:1,startDate:'',noteGlobali:'',giorni:[]};
+        localStorage.removeItem('asfc4_nextDay_'+(user?.id||''));
+        localStorage.removeItem('asfc4_scheda_id_'+(user?.id||''));
       }
       // Never cache scheda in localStorage — always read from DB
       localStorage.removeItem('asfc4_meso');localStorage.removeItem('asfc3_meso');
@@ -1546,17 +1555,20 @@ async function renderHome(){
     const giorni=currentMeso.giorni;
     let nextIdx=0;
     try{
-      const {data:lastSess}=await supa.from('sessioni').select('giorno_index,data_sessione').eq('cliente_id',user.id).eq('completata',true).order('data_sessione',{ascending:false}).order('id',{ascending:false}).limit(1);
-      if(lastSess?.length){
-        const lastIdx=parseInt(lastSess[0].giorno_index)||0;
-        // Cerca il prossimo giorno non-riposo, con wrap-around
-        let found=false;
-        for(let i=1;i<=giorni.length;i++){
-          const idx=(lastIdx+i)%giorni.length;
-          if(giorni[idx]?.tipo!=='riposo'){nextIdx=idx;found=true;break;}
+      // Usa cache locale prima (aggiornata istantaneamente da completeSession)
+      const cached=localStorage.getItem('asfc4_nextDay_'+(user?.id||''));
+      if(cached!==null){
+        nextIdx=parseInt(cached)||0;
+      } else {
+        const {data:lastSess}=await supa.from('sessioni').select('giorno_index').eq('cliente_id',user.id).eq('completata',true).order('data_sessione',{ascending:false}).order('id',{ascending:false}).limit(1);
+        if(lastSess?.length){
+          const lastIdx=parseInt(lastSess[0].giorno_index)||0;
+          for(let i=1;i<=giorni.length;i++){
+            const idx=(lastIdx+i)%giorni.length;
+            if(giorni[idx]?.tipo!=='riposo'){nextIdx=idx;break;}
+          }
+          localStorage.setItem('asfc4_nextDay_'+(user?.id||''), String(nextIdx));
         }
-        // Se non trovato (tutti riposo) usa il primo
-        if(!found) nextIdx=0;
       }
     }catch(e){console.warn('nextWorkout:',e);}
     window._nextWorkoutIdx=nextIdx; // salva globalmente per "Inizia"
@@ -3495,7 +3507,7 @@ async function pollNotifications(){
       // Check promemoria: se quelli salvati in reminders non corrispondono al DB, ricarica
       {
         const today3=new Date().toISOString().slice(0,10);
-        const {data:promFresh}=await supa.from('promemoria').select('id,data_promemoria,messaggio').eq('cliente_id',user.id).gte('data_promemoria',today3).order('data_promemoria');
+        const {data:promFresh}=await supa.from('promemoria').select('id,data_promemoria,messaggio,created_at').eq('cliente_id',user.id).gte('data_promemoria',today3).order('data_promemoria');
         const freshIds=JSON.stringify((promFresh||[]).map(p=>p.id).sort());
         const cachedIds=JSON.stringify(reminders.map(r=>r.id).sort());
         if(freshIds!==cachedIds){
