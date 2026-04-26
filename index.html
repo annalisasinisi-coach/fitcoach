@@ -2125,21 +2125,34 @@ async function exportToPdf(title,questions,answers){
 async function renderPiano(){
   document.getElementById('macro-overview').innerHTML=`<div class="macro-ring-card"><div class="macro-circle prot">${macros.prot}g</div><div><div class="macro-val">${macros.prot}g</div><div class="macro-label">Proteine</div></div></div><div class="macro-ring-card"><div class="macro-circle carb">${macros.carb}g</div><div><div class="macro-val">${macros.carb}g</div><div class="macro-label">Carboidrati</div></div></div><div class="macro-ring-card"><div class="macro-circle fat">${macros.fat}g</div><div><div class="macro-val">${macros.fat}g</div><div class="macro-label">Grassi</div></div></div><div class="macro-ring-card"><div class="macro-circle kcal">${macros.kcal}</div><div><div class="macro-val">${macros.kcal}</div><div class="macro-label">Kcal/giorno</div></div></div>`;
 
-  document.getElementById('meals-container').innerHTML=adminMeals.map(m=>`
-    <details class="meal-details" style="margin-bottom:8px;border:1.5px solid var(--border);border-radius:var(--r2);overflow:hidden">
-      <summary style="padding:12px 16px;cursor:pointer;background:var(--warm);list-style:none;display:flex;align-items:center;justify-content:space-between;user-select:none">
-        <span style="font-size:14px;font-weight:600">${m.nome}</span>
-        <span style="font-size:12px;color:var(--rose);font-weight:600">${m.k} kcal ▼</span>
+  if(!adminMeals.length){
+    document.getElementById('meals-container').innerHTML='';
+    return;
+  }
+  document.getElementById('meals-container').innerHTML=`
+    <details class="card" style="margin-top:4px" open>
+      <summary style="list-style:none;cursor:pointer;display:flex;justify-content:space-between;align-items:center;user-select:none">
+        <div class="card-title" style="margin:0">🍽️ Pasti assegnati</div>
+        <span style="font-size:11px;color:var(--text3)">${adminMeals.length} pasti ▼</span>
       </summary>
-      <div style="padding:12px 16px;background:var(--bg2)">
-        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
-          <span class="mm p">🥩 Prot ${m.p}g</span>
-          <span class="mm c">🌾 Carb ${m.c}g</span>
-          <span class="mm f">🥑 Grassi ${m.f}g</span>
-        </div>
-        <div style="font-size:13px;color:var(--text2);line-height:1.6">${m.foods}</div>
+      <div style="margin-top:12px">
+        ${adminMeals.map(m=>`
+          <details style="margin-bottom:8px;border:1.5px solid var(--border);border-radius:var(--r2);overflow:hidden">
+            <summary style="padding:12px 16px;cursor:pointer;background:var(--warm);list-style:none;display:flex;align-items:center;justify-content:space-between;user-select:none">
+              <span style="font-size:14px;font-weight:600">${m.nome}</span>
+              <span style="font-size:12px;color:var(--rose);font-weight:600">${m.k} kcal ▼</span>
+            </summary>
+            <div style="padding:12px 16px;background:var(--bg2)">
+              <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+                <span class="mm p">🥩 Prot ${m.p}g</span>
+                <span class="mm c">🌾 Carb ${m.c}g</span>
+                <span class="mm f">🥑 Grassi ${m.f}g</span>
+              </div>
+              <div style="font-size:13px;color:var(--text2);line-height:1.6">${m.foods}</div>
+            </div>
+          </details>`).join('')}
       </div>
-    </details>`).join('');
+    </details>`;
 }
 
 // ══════════════════════════════════
@@ -2597,31 +2610,15 @@ async function renderAdminPiano(){
   const list=document.getElementById('admin-meals-list');
   if(!list)return;
   if(!adminMeals.length){list.innerHTML='<div style="font-size:13px;color:var(--text3);font-style:italic;padding:10px 0">Nessun pasto. Seleziona una cliente e aggiungi pasti.</div>';return;}
-  const cId2=document.getElementById('ap-cliente')?.value;
-  const cName2=document.getElementById('ap-cliente')?.options[document.getElementById('ap-cliente')?.selectedIndex]?.text||'Cliente';
-  list.innerHTML=`<details style="border:1.5px solid var(--border);border-radius:var(--r2);overflow:hidden" open>
-    <summary style="padding:10px 14px;cursor:pointer;background:var(--warm);list-style:none;display:flex;justify-content:space-between;align-items:center;user-select:none">
+  list.innerHTML=adminMeals.map((m,i)=>`
+    <div style="background:var(--warm);border:1.5px solid var(--border);border-radius:var(--r);padding:10px 13px;margin-bottom:7px;display:flex;justify-content:space-between;align-items:center">
       <div>
-        <span style="font-size:13px;font-weight:700">👤 ${cName2}</span>
-        <span style="font-size:11px;color:var(--text3);margin-left:8px">${adminMeals.length} ${adminMeals.length===1?'pasto':'pasti'}</span>
+        <div style="font-size:13px;font-weight:600">${m.nome}</div>
+        <div style="font-size:11px;color:var(--text2)">${m.k} kcal · P:${m.p}g C:${m.c}g G:${m.f}g</div>
+        ${m.foods?`<div style="font-size:11px;color:var(--text3);margin-top:2px">${m.foods}</div>`:''}
       </div>
-      <span style="font-size:12px;color:var(--text3)">▼</span>
-    </summary>
-    <div style="padding:8px 14px;background:var(--bg2)">
-      ${adminMeals.map((m,i)=>`
-        <details style="margin-bottom:5px;border:1px solid var(--border);border-radius:var(--r);overflow:hidden">
-          <summary style="padding:8px 12px;cursor:pointer;background:var(--warm);list-style:none;display:flex;justify-content:space-between;align-items:center;user-select:none">
-            <span style="font-size:13px;font-weight:600">${m.nome}</span>
-            <span style="font-size:11px;color:var(--rose)">${m.k} kcal ▼</span>
-          </summary>
-          <div style="padding:8px 12px;background:var(--bg2)">
-            <div style="font-size:12px;color:var(--text2);margin-bottom:6px">P:${m.p}g · C:${m.c}g · G:${m.f}g</div>
-            ${m.foods?`<div style="font-size:12px;color:var(--text3);margin-bottom:8px">${m.foods}</div>`:''}
-            <button class="btn-danger" style="font-size:11px" onclick="delMeal(${i})">✕ Elimina</button>
-          </div>
-        </details>`).join('')}
-    </div>
-  </details>`;
+      <button class="btn-danger" onclick="delMeal(${i})">✕</button>
+    </div>`).join('');
 }
 async function delMeal(i){
   const cId=document.getElementById('ap-cliente')?.value;
@@ -3346,21 +3343,25 @@ async function viewClient(clientId, clientName){
           ${pianoRow.fat_g?`<span style="font-size:12px">🥑 <strong>${pianoRow.fat_g}g</strong> grassi</span>`:''}
           ${pianoRow.kcal?`<span style="font-size:12px">🔥 <strong>${pianoRow.kcal}</strong> kcal</span>`:''}
         </div>`;
-        if(pianoRow.pasti?.length){
-          html+=pianoRow.pasti.map(m=>`
-            <details style="margin-bottom:5px;border:1px solid var(--border);border-radius:var(--r);overflow:hidden">
-              <summary style="padding:8px 12px;cursor:pointer;background:var(--warm);list-style:none;display:flex;justify-content:space-between;align-items:center;user-select:none">
-                <span style="font-size:13px;font-weight:600">${m.nome}</span>
-                <span style="font-size:11px;color:var(--rose)">${m.k||0} kcal ▼</span>
-              </summary>
-              <div style="padding:8px 12px;background:var(--bg2);font-size:12px">
-                <div style="color:var(--text2);margin-bottom:4px">P:${m.p||0}g · C:${m.c||0}g · G:${m.f||0}g</div>
-                ${m.foods?`<div style="color:var(--text3)">${m.foods}</div>`:''}
-              </div>
-            </details>`).join('');
-        } else {
-          html+=`<div style="font-size:13px;color:var(--text3);font-style:italic">Nessun pasto assegnato</div>`;
-        }
+        html+=`<details style="margin-top:8px;border:1px solid var(--border);border-radius:var(--r2);overflow:hidden">
+          <summary style="padding:9px 13px;cursor:pointer;background:var(--warm);list-style:none;display:flex;justify-content:space-between;align-items:center;user-select:none">
+            <span style="font-size:12px;font-weight:600">🍽️ Pasti assegnati</span>
+            <span style="font-size:11px;color:var(--text3)">${pianoRow.pasti?.length||0} pasti ▼</span>
+          </summary>
+          <div style="padding:8px 13px;background:var(--bg2)">
+            ${pianoRow.pasti?.length?pianoRow.pasti.map(m=>`
+              <details style="margin-bottom:5px;border:1px solid var(--border);border-radius:var(--r);overflow:hidden">
+                <summary style="padding:7px 11px;cursor:pointer;background:var(--warm);list-style:none;display:flex;justify-content:space-between;align-items:center;user-select:none">
+                  <span style="font-size:12px;font-weight:600">${m.nome}</span>
+                  <span style="font-size:11px;color:var(--rose)">${m.k||0} kcal ▼</span>
+                </summary>
+                <div style="padding:7px 11px;background:var(--bg2);font-size:12px">
+                  <div style="color:var(--text2);margin-bottom:3px">P:${m.p||0}g · C:${m.c||0}g · G:${m.f||0}g</div>
+                  ${m.foods?`<div style="color:var(--text3)">${m.foods}</div>`:''}
+                </div>
+              </details>`).join(''):'<div style="font-size:13px;color:var(--text3);font-style:italic">Nessun pasto assegnato</div>'}
+          </div>
+        </details>`;
       } else {
         html+=`<div style="font-size:13px;color:var(--text3);font-style:italic">Nessun piano alimentare assegnato</div>`;
       }
@@ -3463,14 +3464,21 @@ async function pollNotifications(){
         const newScheda=scheda?.filter(s=>(s.created_at||'')>since);
         if(newScheda?.length)addNotif('allenamento',1);
       }
-      // Check for new/updated piano alimentare
+      // Check piano alimentare — confronta fingerprint (pasti+macros) con quello salvato
       if(page!=='piano'){
-        const {data:piano}=await supa.from('piani_alimentari').select('id,created_at').eq('cliente_id',user.id);
-        const newPiano=piano?.filter(p=>{
-          const t=(p.created_at)||'';
-          return since&&t>since;
-        });
-        if(newPiano?.length){addNotif('piano',1);toast('🥗 Annalisa ha assegnato un piano alimentare!');}
+        const {data:pianoRows}=await supa.from('piani_alimentari')
+          .select('prot_g,carb_g,fat_g,kcal,pasti')
+          .eq('cliente_id',user.id).limit(1);
+        if(pianoRows?.length){
+          const p=pianoRows[0];
+          const fp=JSON.stringify({prot:p.prot_g,carb:p.carb_g,fat:p.fat_g,kcal:p.kcal,pasti:(p.pasti||[]).length});
+          const storedFp=localStorage.getItem('asfc4_piano_fp_'+user.id);
+          if(storedFp && storedFp!==fp){
+            addNotif('piano',1);
+            toast('🥗 Annalisa ha aggiornato il tuo piano alimentare!');
+          }
+          localStorage.setItem('asfc4_piano_fp_'+user.id, fp);
+        }
       }
       // Check for new promemoria
       if(page!=='home'){
