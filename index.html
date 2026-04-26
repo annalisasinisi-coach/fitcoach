@@ -815,9 +815,9 @@ input,textarea,select{font-family:'DM Sans',sans-serif}
               <div class="card-title">⚙️ Configura macros</div>
               <div class="field"><label>Seleziona cliente</label><select id="ap-cliente" onchange="renderAdminPiano()"><option value="">— Seleziona cliente —</option></select></div>
               <div class="macro-edit-form">
-                <div class="macro-edit-field"><label style="color:var(--rose)">Proteine (g)</label><input type="number" id="ap-prot" value="140" style="border-color:rgba(232,82,122,0.3)"></div>
-                <div class="macro-edit-field"><label style="color:#C07040">Carboidrati (g)</label><input type="number" id="ap-carb" value="180" style="border-color:rgba(245,168,130,0.4)"></div>
-                <div class="macro-edit-field"><label style="color:var(--violet)">Grassi (g)</label><input type="number" id="ap-fat" value="55" style="border-color:rgba(123,63,160,0.3)"></div>
+                <div class="macro-edit-field"><label style="color:var(--rose)">Proteine (g)</label><input type="number" id="ap-prot" value="140" style="border-color:rgba(232,82,122,0.3)" oninput="calcKcal()"></div>
+                <div class="macro-edit-field"><label style="color:#C07040">Carboidrati (g)</label><input type="number" id="ap-carb" value="180" style="border-color:rgba(245,168,130,0.4)" oninput="calcKcal()"></div>
+                <div class="macro-edit-field"><label style="color:var(--violet)">Grassi (g)</label><input type="number" id="ap-fat" value="55" style="border-color:rgba(123,63,160,0.3)" oninput="calcKcal()"></div>
                 <div class="macro-edit-field"><label>Kcal</label><input type="number" id="ap-kcal" value="1740" readonly style="background:var(--warmb);color:var(--text2)"></div>
               </div>
               <div style="display:flex;gap:8px">
@@ -830,10 +830,10 @@ input,textarea,select{font-family:'DM Sans',sans-serif}
               <div class="field"><label>Nome pasto</label><input type="text" id="ap-meal-nome" placeholder="es. Pranzo, Spuntino pre-workout..."></div>
               <div class="field"><label>Alimenti e grammature</label><textarea id="ap-meal-foods" placeholder="Riso 90g, Petto di pollo 150g..."></textarea></div>
               <div style="display:flex;gap:7px;flex-wrap:wrap">
-                <div class="field" style="flex:1;min-width:80px"><label>Prot (g)</label><input type="number" id="ap-meal-p" placeholder="40"></div>
-                <div class="field" style="flex:1;min-width:80px"><label>Carb (g)</label><input type="number" id="ap-meal-c" placeholder="50"></div>
-                <div class="field" style="flex:1;min-width:80px"><label>Grassi (g)</label><input type="number" id="ap-meal-f" placeholder="10"></div>
-                <div class="field" style="flex:1;min-width:80px"><label>Kcal</label><input type="number" id="ap-meal-k" placeholder="460"></div>
+                <div class="field" style="flex:1;min-width:80px"><label>Prot (g)</label><input type="number" id="ap-meal-p" placeholder="40" oninput="calcMealKcal()"></div>
+                <div class="field" style="flex:1;min-width:80px"><label>Carb (g)</label><input type="number" id="ap-meal-c" placeholder="50" oninput="calcMealKcal()"></div>
+                <div class="field" style="flex:1;min-width:80px"><label>Grassi (g)</label><input type="number" id="ap-meal-f" placeholder="10" oninput="calcMealKcal()"></div>
+                <div class="field" style="flex:1;min-width:80px"><label>Kcal</label><input type="number" id="ap-meal-k" placeholder="auto" readonly style="background:var(--warmb);color:var(--text2)"></div>
               </div>
               <button class="btn-primary" style="width:100%" onclick="addMealAdmin()">Aggiungi pasto</button>
             </div>
@@ -1540,13 +1540,27 @@ async function renderHome(){
     mesoWk.textContent='Sett. '+currentMeso.currentWeek+'/'+currentMeso.weeks;
     if(mesoNm) mesoNm.textContent=currentMeso.nome;
   }
-  // Next workout
+  // Next workout — find next non-rest day after last completed session
   const nextName=document.getElementById('next-name');
   if(nextName&&currentMeso.nome&&currentMeso.giorni?.length){
-    const g=currentMeso.giorni[0];
+    // Get last completed session day index
+    let nextIdx=0;
+    try{
+      const {data:lastSess}=await supa.from('sessioni').select('giorno_index').eq('cliente_id',user.id).eq('completata',true).order('data_sessione',{ascending:false}).limit(1);
+      if(lastSess?.length){
+        const lastIdx=lastSess[0].giorno_index||0;
+        // Find next non-rest day after lastIdx
+        const giorni=currentMeso.giorni;
+        for(let i=1;i<=giorni.length;i++){
+          const idx=(lastIdx+i)%giorni.length;
+          if(giorni[idx].tipo!=='riposo'){nextIdx=idx;break;}
+        }
+      }
+    }catch(e){}
+    const g=currentMeso.giorni[nextIdx];
     nextName.textContent=g.label+(g.nome?' — '+g.nome:'');
     const nextMeta=document.getElementById('next-meta');
-    if(nextMeta) nextMeta.textContent=g.esercizi?.length+' esercizi';
+    if(nextMeta) nextMeta.textContent=(g.esercizi?.length||0)+' esercizi';
   }
   // Show reminders for today/upcoming
   const today=new Date().toISOString().slice(0,10);
@@ -2552,6 +2566,7 @@ async function saveNewExercise(){
 
 // ── PIANO ADMIN ──
 async function calcKcal(){const p=parseInt(document.getElementById('ap-prot').value)||0,c=parseInt(document.getElementById('ap-carb').value)||0,f=parseInt(document.getElementById('ap-fat').value)||0;document.getElementById('ap-kcal').value=p*4+c*4+f*9;}
+function calcMealKcal(){const p=parseInt(document.getElementById('ap-meal-p').value)||0,c=parseInt(document.getElementById('ap-meal-c').value)||0,f=parseInt(document.getElementById('ap-meal-f').value)||0;document.getElementById('ap-meal-k').value=p*4+c*4+f*9;}
 async function saveMacros(){
   macros={prot:parseInt(document.getElementById('ap-prot').value)||0,carb:parseInt(document.getElementById('ap-carb').value)||0,fat:parseInt(document.getElementById('ap-fat').value)||0,kcal:parseInt(document.getElementById('ap-kcal').value)||0};
   ss('macros',macros);
@@ -2647,7 +2662,8 @@ async function renderReminders(){
   const el=document.getElementById('reminders-list');if(!el)return;
   el.innerHTML='<div style="font-size:13px;color:var(--text3);padding:10px">⏳ Caricamento...</div>';
   // Fetch without relying on JOIN (FK name may vary across environments)
-  const {data:promDB,error:promErr}=await supa.from('promemoria').select('*').order('data_promemoria');
+  const today2=new Date().toISOString().slice(0,10);
+  const {data:promDB,error:promErr}=await supa.from('promemoria').select('*').gte('data_promemoria',today2).order('data_promemoria');
   if(promErr){console.error('Promemoria error:',promErr);el.innerHTML='<div style="font-size:13px;color:var(--rose);padding:10px">Errore: '+promErr.message+'</div>';return;}
   if(!promDB?.length){el.innerHTML='<div style="font-size:13px;color:var(--text3);font-style:italic;padding:10px">Nessun promemoria attivo.</div>';return;}
   // Manually resolve client names to avoid FK join issues
@@ -2946,7 +2962,7 @@ async function loadAdminQuestionariData() {
         ? new Date(c.created_at).toLocaleDateString('it-IT',{day:'numeric',month:'long',year:'numeric',hour:'2-digit',minute:'2-digit'})
         : '';
       const dataLabel=c.mese?(compiledAt?`${c.mese} — ${compiledAt}`:c.mese):(compiledAt||'Check-in');
-      DEMO_CHECKS[name].push({data:dataLabel,compiledAt,...(c.risposte||{}),_id:c.id,_feedback:c.feedback_coach});
+      DEMO_CHECKS[name].unshift({data:dataLabel,compiledAt,...(c.risposte||{}),_id:c.id,_feedback:c.feedback_coach}); // unshift = più recente prima
     });
   }
   // Add clients with no questionnaires yet
@@ -3458,11 +3474,33 @@ async function pollNotifications(){
         const {data:msgs}=await supa.from('messaggi').select('id').eq('destinatario_id',user.id).gt('created_at',since);
         if(msgs?.length)addNotif('chat',msgs.length);
       }
-      // Check for new/updated scheda (created or updated by coach)
+      // Check scheda: nuova O eliminata
       if(page!=='allenamento'){
         const {data:scheda}=await supa.from('schede').select('id,created_at').eq('cliente_id',user.id).eq('attiva',true);
-        const newScheda=scheda?.filter(s=>(s.created_at||'')>since);
-        if(newScheda?.length)addNotif('allenamento',1);
+        const newScheda=scheda?.filter(s=>since&&(s.created_at||'')>since);
+        if(newScheda?.length){addNotif('allenamento',1);toast('📋 Annalisa ha assegnato una nuova scheda!');}
+        // Se non c'è più scheda attiva ma currentMeso era caricato, ricarica
+        const hasScheda=scheda?.length>0;
+        if(!hasScheda && currentMeso?.nome){
+          currentMeso={giorni:[],weeks:0,nome:''};
+          renderWorkout();
+          renderHome();
+        }
+      }
+      // Check promemoria: se quelli salvati in reminders non corrispondono al DB, ricarica
+      {
+        const today3=new Date().toISOString().slice(0,10);
+        const {data:promFresh}=await supa.from('promemoria').select('id,data_promemoria,messaggio').eq('cliente_id',user.id).gte('data_promemoria',today3).order('data_promemoria');
+        const freshIds=JSON.stringify((promFresh||[]).map(p=>p.id).sort());
+        const cachedIds=JSON.stringify(reminders.map(r=>r.id).sort());
+        if(freshIds!==cachedIds){
+          reminders=(promFresh||[]).map(p=>({id:p.id,date:p.data_promemoria,msg:p.messaggio||''}));
+          ss('reminders',reminders);
+          if(page==='home')renderHome();
+        }
+        // Notifica nuovo promemoria
+        const newProm=(promFresh||[]).filter(p=>since&&(p.created_at||'')>since);
+        if(newProm.length&&page!=='home'){addNotif('home',newProm.length);toast('🔔 Nuovo promemoria da Annalisa!');}
       }
       // Check piano alimentare — confronta fingerprint (pasti+macros) con quello salvato
       if(page!=='piano'){
@@ -3480,11 +3518,7 @@ async function pollNotifications(){
           localStorage.setItem('asfc4_piano_fp_'+user.id, fp);
         }
       }
-      // Check for new promemoria
-      if(page!=='home'){
-        const {data:prom}=await supa.from('promemoria').select('id').eq('cliente_id',user.id).gt('created_at',since);
-        if(prom?.length)addNotif('home',prom.length);
-      }
+      // promemoria check merged above
     } else {
       // Check for new messages to coach
       if(page!=='admin-chat'){
