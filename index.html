@@ -496,7 +496,7 @@ input,textarea,select{font-family:'DM Sans',sans-serif}
             <div style="font-size:16px;font-weight:600" id="next-name">Nessun allenamento assegnato</div>
             <div style="font-size:12px;color:var(--text2)" id="next-meta">— esercizi</div>
           </div>
-          <button class="btn-start" onclick="navigate('allenamento')">Inizia →</button>
+          <button class="btn-start" onclick="navigate('allenamento');setTimeout(()=>{const idx=window._nextWorkoutIdx||0;document.querySelectorAll('.workout-day-details').forEach((d,i)=>{d.open=i===idx;});},300)">Inizia →</button>
         </div>
         <div class="grid-3">
           <div class="stat-card"><div class="stat-icon">📊</div><div class="stat-label">Sessioni completate</div><div class="stat-value" id="home-sessioni">0</div><div class="stat-change" id="home-sessioni-sub"> </div></div>
@@ -1543,24 +1543,29 @@ async function renderHome(){
   // Next workout — find next non-rest day after last completed session
   const nextName=document.getElementById('next-name');
   if(nextName&&currentMeso.nome&&currentMeso.giorni?.length){
-    // Get last completed session day index
+    const giorni=currentMeso.giorni;
     let nextIdx=0;
     try{
-      const {data:lastSess}=await supa.from('sessioni').select('giorno_index').eq('cliente_id',user.id).eq('completata',true).order('data_sessione',{ascending:false}).limit(1);
+      const {data:lastSess}=await supa.from('sessioni').select('giorno_index,data_sessione').eq('cliente_id',user.id).eq('completata',true).order('data_sessione',{ascending:false}).order('id',{ascending:false}).limit(1);
       if(lastSess?.length){
-        const lastIdx=lastSess[0].giorno_index||0;
-        // Find next non-rest day after lastIdx
-        const giorni=currentMeso.giorni;
+        const lastIdx=parseInt(lastSess[0].giorno_index)||0;
+        // Cerca il prossimo giorno non-riposo, con wrap-around
+        let found=false;
         for(let i=1;i<=giorni.length;i++){
           const idx=(lastIdx+i)%giorni.length;
-          if(giorni[idx].tipo!=='riposo'){nextIdx=idx;break;}
+          if(giorni[idx]?.tipo!=='riposo'){nextIdx=idx;found=true;break;}
         }
+        // Se non trovato (tutti riposo) usa il primo
+        if(!found) nextIdx=0;
       }
-    }catch(e){}
-    const g=currentMeso.giorni[nextIdx];
-    nextName.textContent=g.label+(g.nome?' — '+g.nome:'');
-    const nextMeta=document.getElementById('next-meta');
-    if(nextMeta) nextMeta.textContent=(g.esercizi?.length||0)+' esercizi';
+    }catch(e){console.warn('nextWorkout:',e);}
+    window._nextWorkoutIdx=nextIdx; // salva globalmente per "Inizia"
+    const g=giorni[nextIdx];
+    if(g){
+      nextName.textContent=g.label+(g.nome?' — '+g.nome:'');
+      const nextMeta=document.getElementById('next-meta');
+      if(nextMeta) nextMeta.textContent=(g.esercizi?.length||0)+' esercizi';
+    }
   }
   // Show reminders for today/upcoming
   const today=new Date().toISOString().slice(0,10);
@@ -2952,7 +2957,7 @@ async function loadAdminQuestionariData() {
     });
   }
   // Load real check questionari
-  const {data:ckData,error:ckErr}=await supa.from('check_questionari').select('*, profiles(nome,cognome,email)').order('id',{ascending:false});
+  const {data:ckData,error:ckErr}=await supa.from('check_questionari').select('*, profiles(nome,cognome,email)').order('created_at',{ascending:false}).order('id',{ascending:false});
   if(ckData?.length){
     ckData.forEach(c=>{
       const name=((c.profiles?.nome||'')+(c.profiles?.cognome?' '+c.profiles.cognome:'')).trim()||c.profiles?.email||'Cliente';
@@ -3499,8 +3504,12 @@ async function pollNotifications(){
           if(page==='home')renderHome();
         }
         // Notifica nuovo promemoria
-        const newProm=(promFresh||[]).filter(p=>since&&(p.created_at||'')>since);
-        if(newProm.length&&page!=='home'){addNotif('home',newProm.length);toast('🔔 Nuovo promemoria da Annalisa!');}
+        // Notifica: promemoria che non erano in cache prima
+        if(since){
+          const cachedIdArr=(reminders||[]).map(r=>r.id);
+          const brandNew=(promFresh||[]).filter(p=>!cachedIdArr.includes(p.id));
+          if(brandNew.length&&page!=='home'){addNotif('home',brandNew.length);toast('🔔 Nuovo promemoria da Annalisa!');}
+        }
       }
       // Check piano alimentare — confronta fingerprint (pasti+macros) con quello salvato
       if(page!=='piano'){
