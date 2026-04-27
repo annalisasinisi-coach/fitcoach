@@ -1620,8 +1620,11 @@ async function renderWorkout(){
   // Build accordion — each giorno is a <details>
   const acc=document.getElementById('day-tabs-accordion');
   if(acc){
-    const startIdx=window._nextWorkoutIdx||0;
+    // Leggi il giorno da localStorage (fonte più affidabile) o fallback a 0
+    const _storedDay=localStorage.getItem('asfc4_nextDay_'+(user?.id||''));
+    const startIdx=_storedDay!==null?parseInt(_storedDay)||0:(window._nextWorkoutIdx||0);
     currentDay=startIdx;
+    console.log('[WORKOUT] Apro giorno',startIdx,'(stored:'+_storedDay+' global:'+window._nextWorkoutIdx+')');
     acc.innerHTML=currentMeso.giorni.map((g,i)=>{
       const isRest=g.tipo==='riposo';
       const exCount=g.esercizi?.length||0;
