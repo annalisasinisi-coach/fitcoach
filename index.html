@@ -1716,6 +1716,16 @@ async function saveFb(key){const text=document.getElementById(`ftxt_${key}`)?.va
 async function completeSession(){
   if(user?.id&&currentMeso.nome){
     await dbInsert('sessioni',{cliente_id:user.id,giorno_index:currentDay,data_sessione:new Date().toISOString().slice(0,10),completata:true});
+    // Calcola subito il prossimo giorno non-riposo e aggiorna la cache locale
+    // così renderHome e renderWorkout (tasto "Inizia") leggono il valore corretto
+    const giorni=currentMeso.giorni||[];
+    let nextIdx=0;
+    for(let i=1;i<=giorni.length;i++){
+      const idx=(currentDay+i)%giorni.length;
+      if(giorni[idx]?.tipo!=='riposo'){nextIdx=idx;break;}
+    }
+    localStorage.setItem('asfc4_nextDay_'+(user.id||''), String(nextIdx));
+    window._nextWorkoutIdx=nextIdx;
   }
   toast('🎉 Sessione completata! Ottimo lavoro!');
   setTimeout(()=>navigate('home'),800);
