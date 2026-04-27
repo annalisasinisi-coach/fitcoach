@@ -1716,16 +1716,6 @@ async function saveFb(key){const text=document.getElementById(`ftxt_${key}`)?.va
 async function completeSession(){
   if(user?.id&&currentMeso.nome){
     await dbInsert('sessioni',{cliente_id:user.id,giorno_index:currentDay,data_sessione:new Date().toISOString().slice(0,10),completata:true});
-    // Calcola subito il prossimo giorno non-riposo e aggiorna la cache locale
-    // così renderHome e renderWorkout (tasto "Inizia") leggono il valore corretto
-    const giorni=currentMeso.giorni||[];
-    let nextIdx=0;
-    for(let i=1;i<=giorni.length;i++){
-      const idx=(currentDay+i)%giorni.length;
-      if(giorni[idx]?.tipo!=='riposo'){nextIdx=idx;break;}
-    }
-    localStorage.setItem('asfc4_nextDay_'+(user.id||''), String(nextIdx));
-    window._nextWorkoutIdx=nextIdx;
   }
   toast('🎉 Sessione completata! Ottimo lavoro!');
   setTimeout(()=>navigate('home'),800);
@@ -2994,7 +2984,7 @@ async function loadAdminQuestionariData() {
         ? new Date(c.created_at).toLocaleDateString('it-IT',{day:'numeric',month:'long',year:'numeric',hour:'2-digit',minute:'2-digit'})
         : '';
       const dataLabel=c.mese?(compiledAt?`${c.mese} — ${compiledAt}`:c.mese):(compiledAt||'Check-in');
-      DEMO_CHECKS[name].unshift({data:dataLabel,compiledAt,...(c.risposte||{}),_id:c.id,_feedback:c.feedback_coach}); // unshift = più recente prima
+      DEMO_CHECKS[name].push({data:dataLabel,compiledAt,...(c.risposte||{}),_id:c.id,_feedback:c.feedback_coach}); // Supabase restituisce già desc, push mantiene l'ordine corretto
     });
   }
   // Add clients with no questionnaires yet
@@ -3686,9 +3676,9 @@ async function setupRealtimeChat(){
         if(payload.new?.cliente_id!==user.id)return;
         if(page!=='piano'){addNotif('piano',1);toast('🥗 Il tuo piano alimentare è stato aggiornato!');}
       });
-      ch.on('postgres_changes',{event:'*',schema:'public',table:'promemoria'},payload=>{
-        console.log('[CLIENTE] promemoria:',payload.new?.cliente_id,'vs',user.id);
-        if(payload.new?.cliente_id!==user.id)return;
+      ch.on('postgres_changes',{event:'INSERT',schema:'public',table:'promemoria',filter:`cliente_id=eq.${user.id}`},payload=>{
+        // server-side filter già garantisce cliente_id===user.id
+        
         addNotif('home',1);toast('🔔 Nuovo promemoria da Annalisa!');
       });
     });
