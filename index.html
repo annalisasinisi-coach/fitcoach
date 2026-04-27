@@ -1620,10 +1620,12 @@ async function renderWorkout(){
   // Build accordion — each giorno is a <details>
   const acc=document.getElementById('day-tabs-accordion');
   if(acc){
+    const startIdx=window._nextWorkoutIdx||0;
+    currentDay=startIdx;
     acc.innerHTML=currentMeso.giorni.map((g,i)=>{
       const isRest=g.tipo==='riposo';
       const exCount=g.esercizi?.length||0;
-      return `<details class="workout-day-details" id="day-det-${i}" style="border:1.5px solid var(--border);border-radius:var(--r2);margin-bottom:8px;overflow:hidden" ${i===0?'open':''}>
+      return `<details class="workout-day-details" id="day-det-${i}" style="border:1.5px solid var(--border);border-radius:var(--r2);margin-bottom:8px;overflow:hidden" ${i===startIdx?'open':''}>
         <summary style="padding:12px 16px;cursor:pointer;background:${isRest?'var(--warm)':'linear-gradient(135deg,var(--violet-pale),var(--rose-pale))'};list-style:none;display:flex;align-items:center;justify-content:space-between;user-select:none">
           <div>
             <span style="font-size:13px;font-weight:600;color:var(--text)">${g.label}${g.nome?' — '+g.nome:''}</span>
