@@ -1673,7 +1673,7 @@ async function renderDayContentInto(idx, el){
     const libEx=exerciseLibrary.find(e=>e.name===ex.name);
     const stored=weightHist[ex.name];const lastKg=stored?stored.at(-1).kg:'';
     const key=`ex_${idx}_${i}`;const done=ls(key,false);const fb=ls(`fb_${key}`,{emoji:'',text:''});
-    const videoSrc=libEx?.video||ex.video||'';    const videoHTML=videoSrc?`<iframe class="ex-video-embed" src="${videoSrc}" title="${ex.name}" frameborder="0" allowfullscreen loading="lazy"></iframe>`:`<div class="ex-video-ph"><div class="pi">▶</div><span style="font-size:10px;color:var(--text3)">Nessun video</span></div>`;
+    const videoSrc=libEx?.video||ex.video||'';    const videoHTML=videoSrc?ytEmbed(videoSrc,ex.name):`<div class="ex-video-ph"><div class="pi">▶</div><span style="font-size:10px;color:var(--text3)">Nessun video</span></div>`;
     return `<div class="ex-card ${done?'completed':''}" id="card_${key}">
       <div class="ex-top">
         <div class="ex-video-col">${videoHTML}</div>
@@ -2718,7 +2718,7 @@ async function seedExercises(){
 async function renderLibrary(){
   const search=(document.getElementById('lib-search')?.value||'').toLowerCase(),cat=document.getElementById('lib-cat')?.value||'';
   const filtered=exerciseLibrary.filter(e=>(search?e.name.toLowerCase().includes(search):true)&&(cat?e.cat===cat:true));
-  document.getElementById('lib-grid').innerHTML=filtered.map((e,i)=>`<div class="ex-lib-card">${e.video?`<iframe class="ex-video-embed" src="${e.video}" title="${e.name}" frameborder="0" allowfullscreen loading="lazy"></iframe>`:`<div class="ex-lib-video">🏋️</div>`}<div class="ex-lib-info"><div class="ex-lib-name">${e.name}</div><div class="ex-lib-cat">${e.cat}</div>${e.desc?`<div style="font-size:11px;color:var(--text2);margin-top:4px;line-height:1.5">${e.desc}</div>`:''}<div class="ex-lib-actions"><button class="btn-sm" onclick="toast('Usa il nome nella creazione scheda!')">+ Aggiungi</button><button class="btn-danger" onclick="delExercise(${exerciseLibrary.indexOf(e)})">Elimina</button></div></div></div>`).join('');}
+  document.getElementById('lib-grid').innerHTML=filtered.map((e,i)=>`<div class="ex-lib-card">${e.video?ytEmbed(e.video,e.name):`<div class="ex-lib-video">🏋️</div>`}<div class="ex-lib-info"><div class="ex-lib-name">${e.name}</div><div class="ex-lib-cat">${e.cat}</div>${e.desc?`<div style="font-size:11px;color:var(--text2);margin-top:4px;line-height:1.5">${e.desc}</div>`:''}<div class="ex-lib-actions"><button class="btn-sm" onclick="toast('Usa il nome nella creazione scheda!')">+ Aggiungi</button><button class="btn-danger" onclick="delExercise(${exerciseLibrary.indexOf(e)})">Elimina</button></div></div></div>`).join('');}
 async function delExercise(i){
   const ex=exerciseLibrary[i];
   if(ex?.id && user?.id){
@@ -2731,12 +2731,18 @@ async function openNewExModal(){document.getElementById('new-ex-modal').classLis
 async function closeNewExModal(){document.getElementById('new-ex-modal').classList.remove('open');}
 async function saveNewExercise(){
   const name=document.getElementById('new-ex-name').value.trim();if(!name){toast('❌ Inserisci il nome');return;}
-  // Controlla duplicati nella libreria locale
   const existing=exerciseLibrary.find(e=>e.name.trim().toLowerCase()===name.toLowerCase());
   if(existing){toast(`⚠️ "${existing.name}" esiste già nella libreria`);return;}
   const cat=document.getElementById('new-ex-cat').value;let video=document.getElementById('new-ex-video').value.trim();
-  if(video.includes('youtube.com/watch?v=')){try{const vid=new URL(video).searchParams.get('v');video=`https://www.youtube.com/embed/${vid}`;}catch{}}
-  else if(video.includes('youtu.be/')){const vid=video.split('youtu.be/')[1].split('?')[0];video=`https://www.youtube.com/embed/${vid}`;}
+  if(video){
+    let vid=null;
+    if(video.includes('youtube.com/watch?v=')){try{vid=new URL(video).searchParams.get('v');}catch{}}
+    else if(video.includes('youtu.be/')){vid=video.split('youtu.be/')[1].split('?')[0];}
+    else if(video.includes('youtube.com/shorts/')){vid=video.split('/shorts/')[1].split('?')[0];}
+    else if(video.includes('youtube.com/embed/')){vid=video.split('/embed/')[1].split('?')[0];}
+    if(vid){video=`https://www.youtube.com/embed/${vid}`;}
+    else{toast('❌ URL YouTube non valido. Usa il link del video (watch, shorts o youtu.be)');return;}
+  }
   const desc=document.getElementById('new-ex-desc').value.trim();
   exerciseLibrary.push({id:Date.now(),name,cat,video,desc});
   ss('library',exerciseLibrary);
@@ -3372,6 +3378,23 @@ async function sendInvite(){
 async function now(){const d=new Date();return `${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}`;}
 
 let toastTm;
+function ytEmbed(src,title=''){
+  const m=src.match(/youtube\.com\/embed\/([^?&]+)/);
+  const vid=m?m[1]:null;
+  const thumb=vid?`https://img.youtube.com/vi/${vid}/hqdefault.jpg`:null;
+  const watchUrl=vid?`https://www.youtube.com/watch?v=${vid}`:src;
+  const fid='ytfb-'+Math.random().toString(36).slice(2,7);
+  return `<div style="position:relative;width:100%;aspect-ratio:16/9">
+    <iframe id="${fid}-f" class="ex-video-embed" src="${src}" title="${title}" frameborder="0" allowfullscreen loading="lazy"
+      onerror="document.getElementById('${fid}-f').style.display='none';document.getElementById('${fid}-p').style.display='flex'"></iframe>
+    <a id="${fid}-p" href="${watchUrl}" target="_blank" rel="noopener"
+      style="display:none;position:absolute;inset:0;flex-direction:column;align-items:center;justify-content:center;background:var(--warm);text-decoration:none;gap:6px;color:var(--rose)">
+      ${thumb?`<img src="${thumb}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0.5" onerror="this.style.display='none'">`:''}
+      <div style="position:relative;width:44px;height:44px;border-radius:50%;background:rgba(232,82,122,0.85);display:flex;align-items:center;justify-content:center;font-size:20px">▶</div>
+      <span style="position:relative;font-size:10px;font-weight:600">Apri su YouTube</span>
+    </a>
+  </div>`;
+}
 async function toast(msg){clearTimeout(toastTm);document.getElementById('toast-txt').textContent=msg;document.getElementById('toast-el').classList.add('show');toastTm=setTimeout(()=>document.getElementById('toast-el').classList.remove('show'),2800);}
 
 // ── REGISTER ──
