@@ -502,7 +502,7 @@ input,textarea,select{font-family:'DM Sans',sans-serif}
             <div style="font-size:16px;font-weight:600" id="next-name">Nessun allenamento assegnato</div>
             <div style="font-size:12px;color:var(--text2)" id="next-meta">— esercizi</div>
           </div>
-          <button class="btn-start" onclick="navigate('allenamento');setTimeout(()=>{const idx=window._nextWorkoutIdx||0;document.querySelectorAll('.workout-day-details').forEach((d,i)=>{d.open=i===idx;});},300)">Inizia →</button>
+          <button class="btn-start" onclick="navigate('allenamento');setTimeout(()=>{const idx=parseInt(localStorage.getItem('asfc4_nextDay_'+(user?.id||'')))||0;const el=document.getElementById('day-det-'+idx);if(el){el.open=true;el.scrollIntoView({behavior:'smooth',block:'start'});}},350)">Inizia →</button>
         </div>
         <div class="grid-3">
           <div class="stat-card"><div class="stat-icon">📊</div><div class="stat-label">Sessioni completate</div><div class="stat-value" id="home-sessioni">0</div><div class="stat-change" id="home-sessioni-sub"> </div></div>
@@ -1729,6 +1729,16 @@ async function saveFb(key){const text=document.getElementById(`ftxt_${key}`)?.va
 async function completeSession(){
   if(user?.id&&currentMeso.nome){
     await dbInsert('sessioni',{cliente_id:user.id,giorno_index:currentDay,data_sessione:new Date().toISOString().slice(0,10),completata:true});
+    const giorni=currentMeso.giorni;
+    if(giorni?.length){
+      let nextIdx=0;
+      for(let i=1;i<=giorni.length;i++){
+        const idx=(currentDay+i)%giorni.length;
+        if(giorni[idx]?.tipo!=='riposo'){nextIdx=idx;break;}
+      }
+      localStorage.setItem('asfc4_nextDay_'+(user?.id||''),String(nextIdx));
+      window._nextWorkoutIdx=nextIdx;
+    }
   }
   toast('🎉 Sessione completata! Ottimo lavoro!');
   setTimeout(()=>navigate('home'),800);
