@@ -540,6 +540,7 @@ input,textarea,select{font-family:'DM Sans',sans-serif}
             </div>
           </div>
         </div>
+        <div id="schede-week-selector" style="display:none"></div>
         <div id="day-tabs-accordion"></div>
         <div id="day-content" style="display:none"></div>
         <button class="btn-primary" style="width:100%;margin-top:14px" onclick="completeSession()">✓ Completa sessione</button>
@@ -1359,20 +1360,20 @@ async function loadUserData(){
       const {data:schedaData}=await supa.from('schede').select('*').eq('cliente_id',user.id).eq('attiva',true).order('created_at',{ascending:false});
       if(schedaData?.length){
         // Helper: estrai settimana_rif e giorni dal campo giorni (supporta vecchio formato array e nuovo {settimana_rif, giorni})
-        const parseScheda=(s)=>{const raw=s.giorni;if(Array.isArray(raw))return{settimana_rif:0,giorni:raw};return{settimana_rif:raw?.settimana_rif||0,giorni:raw?.giorni||[]};};
         // Calcola settimana corrente basandosi sulla start_date della scheda più vecchia con start_date
         const refScheda=schedaData.filter(s=>s.start_date).sort((a,b)=>new Date(a.start_date)-new Date(b.start_date))[0];
         let currentWeekNum=1;
         if(refScheda?.start_date){const diff=Math.floor((Date.now()-new Date(refScheda.start_date))/604800000);currentWeekNum=Math.max(1,diff+1);}
         // Salva lista completa schede per il selettore settimane
-        window._allSchede=schedaData.map(s=>({...s,...parseScheda(s),_raw:s}));
+        window._allSchede=schedaData.map(s=>({...s,settimana_rif:parseSettimanaRif(s.giorni)}));
         // Seleziona scheda: prima quella con settimana_rif==currentWeekNum, poi quella con settimana_rif==0 (tutte)
         let chosen=window._allSchede.find(s=>s.settimana_rif===currentWeekNum)||window._allSchede.find(s=>s.settimana_rif===0)||window._allSchede[0];
-        const s=chosen._raw;
+        const s=chosen;
+        window._currentSchedaId=s.id;
         const cachedSchedaId=localStorage.getItem('asfc4_scheda_id_'+(user?.id||''));
         if(cachedSchedaId && cachedSchedaId!==s.id){localStorage.removeItem('asfc4_nextDay_'+(user?.id||''));console.log('[SCHEDA] Nuova scheda rilevata, reset giorno cache');}
         localStorage.setItem('asfc4_scheda_id_'+(user?.id||''), s.id);
-        currentMeso={nome:s.nome,weeks:s.weeks||4,currentWeek:currentWeekNum,startDate:s.start_date||'',noteGlobali:s.note_globali||'',giorni:chosen.giorni};
+        currentMeso={nome:s.nome,weeks:s.weeks||4,currentWeek:currentWeekNum,startDate:s.start_date||'',noteGlobali:s.note_globali||'',giorni:parseGiorni(s.giorni)};
       } else {
         currentMeso={nome:'',weeks:4,currentWeek:1,startDate:'',noteGlobali:'',giorni:[]};
         localStorage.removeItem('asfc4_nextDay_'+(user?.id||''));
@@ -1637,8 +1638,24 @@ async function renderWorkout(){
   const metaText=sd&&!isNaN(sd)?`Settimana ${currentMeso.currentWeek} di ${currentMeso.weeks} · ${sd.toLocaleDateString('it-IT',{day:'numeric',month:'short'})} — ${ed.toLocaleDateString('it-IT',{day:'numeric',month:'short',year:'numeric'})}`:`Settimana ${currentMeso.currentWeek} di ${currentMeso.weeks}`;
   document.getElementById('meso-disp-meta').textContent=metaText;
   document.getElementById('meso-weeks').innerHTML=Array.from({length:currentMeso.weeks},(_,i)=>{const w=i+1;const cls=w<currentMeso.currentWeek?'done':w===currentMeso.currentWeek?'current':'';return `<div class="meso-week ${cls}">${w}</div>`;}).join('');
-  // Build accordion — each giorno is a <details>
+  // Selettore settimane se ci sono più schede assegnate
   const acc=document.getElementById('day-tabs-accordion');
+  const allSchede=window._allSchede||[];
+  const schedeSelector=document.getElementById('schede-week-selector');
+  if(schedeSelector){
+    if(allSchede.length>1){
+      schedeSelector.innerHTML=`<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;align-items:center">
+        <span style="font-size:11px;color:var(--text3);font-weight:600">SCHEDA:</span>
+        ${allSchede.map(s=>{
+          const srif=parseSettimanaRif(s.giorni);
+          const label=srif>0?`Sett. ${srif}`:'Generale';
+          const isCurrent=s.id===window._currentSchedaId;
+          return `<button onclick="switchScheda('${s.id}')" style="padding:5px 12px;border-radius:20px;border:1.5px solid ${isCurrent?'var(--violet)':'var(--border)'};background:${isCurrent?'var(--violet)':'var(--warm)'};color:${isCurrent?'#fff':'var(--text)'};font-size:12px;font-weight:600;cursor:pointer">${label} — ${s.nome}</button>`;
+        }).join('')}
+      </div>`;
+      schedeSelector.style.display='';
+    } else {schedeSelector.style.display='none';}
+  }
   if(acc){
     // Leggi il giorno da localStorage (fonte più affidabile) o fallback a 0
     const _storedDay=localStorage.getItem('asfc4_nextDay_'+(user?.id||''));
@@ -1662,6 +1679,13 @@ async function renderWorkout(){
     // Render content for each day
     currentMeso.giorni.forEach((_,i)=>renderDayContentInto(i, document.getElementById('day-acc-'+i)));
   }
+}
+async function switchScheda(id){
+  const s=(window._allSchede||[]).find(s=>s.id===id);if(!s)return;
+  window._currentSchedaId=id;
+  currentMeso={nome:s.nome,weeks:s.weeks||4,currentWeek:currentMeso.currentWeek,startDate:s.start_date||'',noteGlobali:s.note_globali||'',giorni:parseGiorni(s.giorni)};
+  localStorage.removeItem('asfc4_nextDay_'+(user?.id||''));
+  renderWorkout();
 }
 async function switchDay(idx,btn){currentDay=idx;document.querySelectorAll('.day-tab').forEach(b=>b.classList.remove('active'));btn.classList.add('active');renderDayContent(idx);}
 async function renderDayContent(idx){
@@ -2383,6 +2407,9 @@ async function renderAdminDash(){
   </tr>`).join('');}
 
 // ── SCHEDA BUILDER ──
+// Helper: estrai array giorni dal campo (supporta vecchio formato array e nuovo {settimana_rif, giorni})
+function parseGiorni(raw){return Array.isArray(raw)?raw:(raw?.giorni||[]);}
+function parseSettimanaRif(raw){return Array.isArray(raw)?0:(raw?.settimana_rif||0);}
 let dayCount=0;
 let editingSchedaId=null;
 async function addDay(){
@@ -2464,9 +2491,7 @@ async function renderSchedeList(){
   const {data:schedeData}=await supa.from('schede').select('*').eq('attiva',true).order('created_at',{ascending:false});
   if(schedeData?.length){
     schedeList=schedeData.map(s=>{
-      const raw=s.giorni;
-      const settimana_rif=Array.isArray(raw)?0:(raw?.settimana_rif||0);
-      return {id:s.id,nome:s.nome,clienteId:s.cliente_id,weeks:s.weeks,start:s.start_date,data:s.created_at?.slice(0,10),settimana_rif};
+      return {id:s.id,nome:s.nome,clienteId:s.cliente_id,weeks:s.weeks,start:s.start_date,data:s.created_at?.slice(0,10),settimana_rif:parseSettimanaRif(s.giorni)};
     });
   } else {
     schedeList=[];
@@ -2639,7 +2664,7 @@ async function renderTemplatesList(){
       <summary style="padding:10px 14px;cursor:pointer;background:linear-gradient(135deg,var(--violet-pale),var(--rose-pale));list-style:none;display:flex;align-items:center;justify-content:space-between;user-select:none">
         <div>
           <span style="font-size:13px;font-weight:600">📁 ${t.nome}</span>
-          <span style="font-size:11px;color:var(--text3);margin-left:8px">${t.weeks||4} sett. · ${(t.giorni||[]).length} giorni</span>
+          <span style="font-size:11px;color:var(--text3);margin-left:8px">${t.weeks||4} sett. · ${parseGiorni(t.giorni).length} giorni</span>
         </div>
         <span style="font-size:12px;color:var(--text3)">▼</span>
       </summary>
@@ -2648,7 +2673,7 @@ async function renderTemplatesList(){
           <button class="btn-sm" style="flex:1" onclick="loadTemplate('${t.id}')">Carica nel builder →</button>
           <button class="btn-danger" onclick="delTemplate('${t.id}')">✕</button>
         </div>
-        ${(t.giorni||[]).map(g=>{
+        ${parseGiorni(t.giorni).map(g=>{
           const isRest=g.tipo==='riposo';
           const exCount=(g.esercizi||[]).length;
           return `<details style="margin-bottom:4px;border:1px solid var(--border);border-radius:var(--r);overflow:hidden">
@@ -2711,9 +2736,8 @@ async function loadSchedaInBuilder(id){
   const si=document.getElementById('s-start');if(si)si.value=data.start_date||'';
   document.getElementById('s-note-globali').value=data.note_globali||'';
   // Parse formato giorni (array=vecchio, object=nuovo con settimana_rif)
-  const rawGiorni=data.giorni;
-  const giorniArr=Array.isArray(rawGiorni)?rawGiorni:(rawGiorni?.giorni||[]);
-  const settRif=Array.isArray(rawGiorni)?0:(rawGiorni?.settimana_rif||0);
+  const giorniArr=parseGiorni(data.giorni);
+  const settRif=parseSettimanaRif(data.giorni);
   const sr=document.getElementById('s-settimana-rif');if(sr)sr.value=String(settRif);
   document.getElementById('days-container').innerHTML='';dayCount=0;
   for(const g of giorniArr){
@@ -3551,7 +3575,7 @@ async function viewClient(clientId, clientName){
     html+=`<div style="margin-bottom:18px"><div style="font-size:11px;text-transform:uppercase;letter-spacing:0.06em;color:var(--text3);font-weight:600;margin-bottom:8px">📋 SCHEDA</div>`;
     if(scheda?.length){
       const s=scheda[0];
-      const giorniHtml=(s.giorni||[]).map((g,gi)=>{
+      const _giorniArr=parseGiorni(s.giorni);const giorniHtml=_giorniArr.map((g,gi)=>{
         if(g.tipo==='riposo') return `<details style="margin-bottom:5px;border:1px solid var(--border);border-radius:var(--r);overflow:hidden">
           <summary style="padding:8px 12px;cursor:pointer;background:var(--warm);list-style:none;display:flex;align-items:center;gap:8px;user-select:none">
             <span style="font-size:11px;font-weight:700;background:var(--peach-pale);color:#C07040;padding:2px 8px;border-radius:10px">${g.label}</span>
@@ -3583,7 +3607,7 @@ async function viewClient(clientId, clientName){
         <summary style="padding:10px 14px;cursor:pointer;background:linear-gradient(135deg,var(--violet-pale),var(--rose-pale));list-style:none;display:flex;align-items:center;justify-content:space-between;user-select:none">
           <div>
             <div style="font-weight:600;font-size:13px">${s.nome}</div>
-            <div style="font-size:11px;color:var(--text3)">Sett. ${s.current_week||1}/${s.weeks||4} · ${s.giorni?.length||0} giorni · ${(s.giorni||[]).reduce((tot,g)=>tot+(g.esercizi||[]).length,0)} esercizi</div>
+            <div style="font-size:11px;color:var(--text3)">Sett. ${s.current_week||1}/${s.weeks||4} · ${parseGiorni(s.giorni).length} giorni · ${parseGiorni(s.giorni).reduce((tot,g)=>tot+(g.esercizi||[]).length,0)} esercizi</div>
           </div>
           <div style="display:flex;align-items:center;gap:8px">
             <button class="btn-ghost" style="font-size:11px;padding:4px 8px" onclick="event.preventDefault();event.stopPropagation();printSchedaData(window._lastSchedaCoach,'${nome}')">🖨️</button>
@@ -3965,8 +3989,8 @@ function printScheda(){
   printSchedaData(currentMeso, '');
 }
 function printSchedaData(s, clienteName){
-  if(!s||!s.giorni?.length){toast('❌ Nessuna scheda da stampare');return;}
-  const giorni=s.giorni||[];
+  if(!s){toast('❌ Nessuna scheda da stampare');return;}
+  const giorni=parseGiorni(s.giorni);if(!giorni.length){toast('❌ Nessuna scheda da stampare');return;}
   const giornoHtml=g=>{
     if(g.tipo==='riposo') return `<tr><td colspan="6" style="padding:10px 8px;background:#FDF0F5;font-style:italic;color:#C07040">😴 ${g.label} — ${g.nome||'Riposo'}</td></tr>`;
     const exRows=(g.esercizi||[]).map((ex,i)=>`
