@@ -502,7 +502,7 @@ input,textarea,select{font-family:'DM Sans',sans-serif}
             <div style="font-size:16px;font-weight:600" id="next-name">Nessun allenamento assegnato</div>
             <div style="font-size:12px;color:var(--text2)" id="next-meta">— esercizi</div>
           </div>
-          <button class="btn-start" onclick="navigate('allenamento');setTimeout(()=>{const idx=parseInt(localStorage.getItem('asfc4_nextDay_'+(user?.id||'')))||0;const el=document.getElementById('day-det-'+idx);if(el){el.open=true;el.scrollIntoView({behavior:'smooth',block:'start'});}},350)">Inizia →</button>
+          <button class="btn-start" onclick="startNextWorkout()">Inizia →</button>
         </div>
         <div class="grid-3">
           <div class="stat-card"><div class="stat-icon">📊</div><div class="stat-label">Sessioni completate</div><div class="stat-value" id="home-sessioni">0</div><div class="stat-change" id="home-sessioni-sub"> </div></div>
@@ -1365,7 +1365,7 @@ async function loadUserData(){
         let currentWeekNum=1;
         if(refScheda?.start_date){const diff=Math.floor((Date.now()-new Date(refScheda.start_date))/604800000);currentWeekNum=Math.max(1,diff+1);}
         // Salva lista completa schede per il selettore settimane
-        window._allSchede=schedaData.map(s=>({...s,settimana_rif:parseSettimanaRif(s.giorni)}));
+        window._allSchede=schedaData.map(s=>({...s,settimana_rif:parseSettimanaRif(s.giorni)})).sort((a,b)=>((a.settimana_rif||999)-(b.settimana_rif||999)));
         // Seleziona scheda: prima quella con settimana_rif==currentWeekNum, poi quella con settimana_rif==0 (tutte)
         let chosen=window._allSchede.find(s=>s.settimana_rif===currentWeekNum)||window._allSchede.find(s=>s.settimana_rif===0)||window._allSchede[0];
         const s=chosen;
@@ -1570,13 +1570,18 @@ async function renderHome(){
     mesoWk.textContent='Sett. '+currentMeso.currentWeek+'/'+currentMeso.weeks;
     if(mesoNm) mesoNm.textContent=currentMeso.nome;
   }
-  // Next workout — find next non-rest day after last completed session
+  // Next workout — find next non-rest day, respecting cross-scheda advance
   const nextName=document.getElementById('next-name');
   if(nextName&&currentMeso.nome&&currentMeso.giorni?.length){
-    const giorni=currentMeso.giorni;
+    // Scheda da usare per il prossimo allenamento (può essere la successiva dopo wrap)
+    const nextSchedaId=localStorage.getItem('asfc4_nextSchedaId_'+(user?.id||''));
+    let nextScheda=null;
+    if(nextSchedaId&&nextSchedaId!==window._currentSchedaId){
+      nextScheda=(window._allSchede||[]).find(s=>s.id===nextSchedaId)||null;
+    }
+    const giorni=nextScheda?parseGiorni(nextScheda.giorni):currentMeso.giorni;
     let nextIdx=0;
     try{
-      // Usa cache locale prima (aggiornata istantaneamente da completeSession)
       const cached=localStorage.getItem('asfc4_nextDay_'+(user?.id||''));
       if(cached!==null){
         nextIdx=parseInt(cached)||0;
@@ -1592,7 +1597,8 @@ async function renderHome(){
         }
       }
     }catch(e){console.warn('nextWorkout:',e);}
-    window._nextWorkoutIdx=nextIdx; // salva globalmente per "Inizia"
+    window._nextWorkoutIdx=nextIdx;
+    window._nextSchedaId=nextSchedaId||window._currentSchedaId;
     const g=giorni[nextIdx];
     if(g){
       nextName.textContent=g.label+(g.nome?' — '+g.nome:'');
@@ -1679,6 +1685,20 @@ async function renderWorkout(){
     // Render content for each day
     currentMeso.giorni.forEach((_,i)=>renderDayContentInto(i, document.getElementById('day-acc-'+i)));
   }
+}
+function startNextWorkout(){
+  const nextSchedaId=window._nextSchedaId||window._currentSchedaId;
+  if(nextSchedaId&&nextSchedaId!==window._currentSchedaId){
+    // Avanza alla scheda successiva prima di navigare
+    switchScheda(nextSchedaId);
+    localStorage.removeItem('asfc4_nextSchedaId_'+(user?.id||''));
+  }
+  navigate('allenamento');
+  setTimeout(()=>{
+    const idx=parseInt(localStorage.getItem('asfc4_nextDay_'+(user?.id||'')))||0;
+    const el=document.getElementById('day-det-'+idx);
+    if(el){el.open=true;el.scrollIntoView({behavior:'smooth',block:'start'});}
+  },350);
 }
 async function switchScheda(id){
   const s=(window._allSchede||[]).find(s=>s.id===id);if(!s)return;
@@ -1790,10 +1810,24 @@ async function completeSession(){
     await dbInsert('sessioni',{cliente_id:user.id,giorno_index:currentDay,data_sessione:new Date().toISOString().slice(0,10),completata:true});
     const giorni=currentMeso.giorni;
     if(giorni?.length){
-      let nextIdx=0;
+      let nextIdx=0;let looped=false;
       for(let i=1;i<=giorni.length;i++){
         const idx=(currentDay+i)%giorni.length;
-        if(giorni[idx]?.tipo!=='riposo'){nextIdx=idx;break;}
+        if(giorni[idx]?.tipo!=='riposo'){nextIdx=idx;looped=(currentDay+i)>=giorni.length;break;}
+      }
+      // Se abbiamo completato il ciclo, avanza alla scheda della settimana successiva
+      if(looped){
+        const allSchede=window._allSchede||[];
+        const curI=allSchede.findIndex(s=>s.id===window._currentSchedaId);
+        const nextScheda=allSchede[curI+1]||null; // null = nessuna prossima
+        if(nextScheda){
+          window._currentSchedaId=nextScheda.id;
+          currentMeso={nome:nextScheda.nome,weeks:nextScheda.weeks||4,currentWeek:currentMeso.currentWeek,startDate:nextScheda.start_date||'',noteGlobali:nextScheda.note_globali||'',giorni:parseGiorni(nextScheda.giorni)};
+          // Trova il primo giorno non-riposo nella nuova scheda
+          nextIdx=0;
+          for(let j=0;j<currentMeso.giorni.length;j++){if(currentMeso.giorni[j]?.tipo!=='riposo'){nextIdx=j;break;}}
+          localStorage.setItem('asfc4_nextSchedaId_'+(user?.id||''),nextScheda.id);
+        }
       }
       localStorage.setItem('asfc4_nextDay_'+(user?.id||''),String(nextIdx));
       window._nextWorkoutIdx=nextIdx;
@@ -3554,7 +3588,7 @@ async function viewClient(clientId, clientName){
     const [{data:prof},{data:ci},{data:scheda},{data:pesi},{data:feedbacks},{data:piano}]=await Promise.all([
       supa.from('profiles').select('*').eq('id',clientId).maybeSingle(),
       supa.from('checkins').select('*').eq('cliente_id',clientId).order('created_at',{ascending:false}).limit(5),
-      supa.from('schede').select('*').eq('cliente_id',clientId).eq('attiva',true).limit(1),
+      supa.from('schede').select('*').eq('cliente_id',clientId).eq('attiva',true).order('created_at',{ascending:true}),
       supa.from('pesi_esercizi').select('*').eq('cliente_id',clientId).order('data_registrazione',{ascending:false}).limit(20),
       supa.from('feedback_esercizi').select('*').eq('cliente_id',clientId).order('created_at',{ascending:false}).limit(10),
       supa.from('piani_alimentari').select('*').eq('cliente_id',clientId).order('updated_at',{ascending:false}).limit(1)
@@ -3571,51 +3605,20 @@ async function viewClient(clientId, clientName){
       ${p.peso?`<div style="font-size:12px;color:var(--text3)">⚖️ ${p.peso}kg · 📏 ${p.altezza||'—'}cm</div>`:''}
       ${p.obiettivo?`<div style="font-size:12px;color:var(--violet);margin-top:4px">🎯 ${p.obiettivo}</div>`:''}
       </div></div>`;
-    // Scheda
-    html+=`<div style="margin-bottom:18px"><div style="font-size:11px;text-transform:uppercase;letter-spacing:0.06em;color:var(--text3);font-weight:600;margin-bottom:8px">📋 SCHEDA</div>`;
-    if(scheda?.length){
-      const s=scheda[0];
-      const _giorniArr=parseGiorni(s.giorni);const giorniHtml=_giorniArr.map((g,gi)=>{
-        if(g.tipo==='riposo') return `<details style="margin-bottom:5px;border:1px solid var(--border);border-radius:var(--r);overflow:hidden">
-          <summary style="padding:8px 12px;cursor:pointer;background:var(--warm);list-style:none;display:flex;align-items:center;gap:8px;user-select:none">
-            <span style="font-size:11px;font-weight:700;background:var(--peach-pale);color:#C07040;padding:2px 8px;border-radius:10px">${g.label}</span>
-            <span style="font-size:12px;font-weight:600">${g.nome||'Riposo'}</span>
-            <span style="font-size:11px;color:var(--text3)">😴</span>
-          </summary>
-          <div style="padding:8px 12px;background:var(--bg2);font-size:12px;color:var(--text3);font-style:italic">${g.note||'Giornata di recupero'}</div>
-        </details>`;
-        const exHtml=(g.esercizi||[]).map((ex,ei)=>`
-          <div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border)">
-            <div style="width:20px;height:20px;border-radius:50%;background:var(--rose-pale);color:var(--rose);font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">${ei+1}</div>
-            <div style="flex:1;min-width:0">
-              <div style="font-size:12px;font-weight:600">${ex.name}</div>
-              <div style="font-size:11px;color:var(--text2)">${ex.sets}×${ex.reps} · Rec ${ex.recupero||'—'} · RPE ${ex.rpe||'—'}</div>
-            </div>
-          </div>`).join('');
-        return `<details style="margin-bottom:5px;border:1px solid var(--border);border-radius:var(--r);overflow:hidden">
-          <summary style="padding:8px 12px;cursor:pointer;background:var(--warm);list-style:none;display:flex;align-items:center;justify-content:space-between;user-select:none">
-            <div style="display:flex;align-items:center;gap:8px">
-              <span style="font-size:11px;font-weight:700;background:var(--rose-pale);color:var(--rose);padding:2px 8px;border-radius:10px">${g.label}</span>
-              <span style="font-size:12px;font-weight:600">${g.nome||''}</span>
-            </div>
-            <span style="font-size:11px;color:var(--text3)">${(g.esercizi||[]).length} es. ▼</span>
-          </summary>
-          <div style="padding:8px 12px;background:var(--bg2)">${exHtml}${g.note?'<div style="font-size:11px;color:var(--text2);margin-top:6px;padding-top:6px;border-top:1px solid var(--border)">📝 '+g.note+'</div>':''}</div>
-        </details>`;
-      }).join('');
-      html+=`<details style="margin-bottom:12px;border:1.5px solid rgba(123,63,160,0.2);border-radius:var(--r2);overflow:hidden" open>
-        <summary style="padding:10px 14px;cursor:pointer;background:linear-gradient(135deg,var(--violet-pale),var(--rose-pale));list-style:none;display:flex;align-items:center;justify-content:space-between;user-select:none">
-          <div>
-            <div style="font-weight:600;font-size:13px">${s.nome}</div>
-            <div style="font-size:11px;color:var(--text3)">Sett. ${s.current_week||1}/${s.weeks||4} · ${parseGiorni(s.giorni).length} giorni · ${parseGiorni(s.giorni).reduce((tot,g)=>tot+(g.esercizi||[]).length,0)} esercizi</div>
-          </div>
-          <div style="display:flex;align-items:center;gap:8px">
-            <button class="btn-ghost" style="font-size:11px;padding:4px 8px" onclick="event.preventDefault();event.stopPropagation();printSchedaData(window._lastSchedaCoach,'${nome}')">🖨️</button>
-            <span style="font-size:12px;color:var(--text3)">▼</span>
-          </div>
-        </summary>
-        <div style="padding:10px 14px;background:var(--bg2)">${giorniHtml}${s.note_globali?'<div style="font-size:11px;color:var(--text2);margin-top:8px;padding:8px;border-radius:var(--r);background:var(--warm)">📋 '+s.note_globali+'</div>':''}</div>
-      </details>`;
+    // Scheda — tutte le settimane, ordinate per settimana_rif
+    const _schedeOrd=(scheda||[]).map(s=>({...s,_srif:parseSettimanaRif(s.giorni)})).sort((a,b)=>(a._srif||999)-(b._srif||999));
+    html+=`<div style="margin-bottom:18px"><div style="font-size:11px;text-transform:uppercase;letter-spacing:0.06em;color:var(--text3);font-weight:600;margin-bottom:8px">📋 SCHEDE (${_schedeOrd.length})</div>`;
+    if(_schedeOrd.length){
+      _schedeOrd.forEach(s=>{
+        const srifLabel=s._srif>0?`Settimana ${s._srif}`:'Generale';
+        const giorniArr=parseGiorni(s.giorni);
+        const giorniHtml=giorniArr.map((g,gi)=>{
+          if(g.tipo==='riposo') return `<details style="margin-bottom:5px;border:1px solid var(--border);border-radius:var(--r);overflow:hidden"><summary style="padding:8px 12px;cursor:pointer;background:var(--warm);list-style:none;display:flex;align-items:center;gap:8px;user-select:none"><span style="font-size:11px;font-weight:700;background:var(--peach-pale);color:#C07040;padding:2px 8px;border-radius:10px">${g.label}</span><span style="font-size:12px;font-weight:600">${g.nome||'Riposo'}</span><span style="font-size:11px;color:var(--text3)">😴</span></summary><div style="padding:8px 12px;background:var(--bg2);font-size:12px;color:var(--text3);font-style:italic">${g.note||'Giornata di recupero'}</div></details>`;
+          const exHtml=(g.esercizi||[]).map((ex,ei)=>`<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border)"><div style="width:20px;height:20px;border-radius:50%;background:var(--rose-pale);color:var(--rose);font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">${ei+1}</div><div style="flex:1;min-width:0"><div style="font-size:12px;font-weight:600">${ex.name}${ex.gruppo?` <span style="font-size:10px;background:var(--violet-pale);color:var(--violet);padding:1px 5px;border-radius:6px">${ex.tipoGruppo||''} ${ex.gruppo}</span>`:''}</div><div style="font-size:11px;color:var(--text2)">${ex.sets}×${ex.reps} · Rec ${ex.recupero||'—'}${ex.rpe!=null?' · RPE '+ex.rpe:''}${ex.rir!=null?' · RIR '+ex.rir:''}</div></div></div>`).join('');
+          return `<details style="margin-bottom:5px;border:1px solid var(--border);border-radius:var(--r);overflow:hidden"><summary style="padding:8px 12px;cursor:pointer;background:var(--warm);list-style:none;display:flex;align-items:center;justify-content:space-between;user-select:none"><div style="display:flex;align-items:center;gap:8px"><span style="font-size:11px;font-weight:700;background:var(--rose-pale);color:var(--rose);padding:2px 8px;border-radius:10px">${g.label}</span><span style="font-size:12px;font-weight:600">${g.nome||''}</span></div><span style="font-size:11px;color:var(--text3)">${(g.esercizi||[]).length} es. ▼</span></summary><div style="padding:8px 12px;background:var(--bg2)">${exHtml}${g.note?'<div style="font-size:11px;color:var(--text2);margin-top:6px;padding-top:6px;border-top:1px solid var(--border)">📝 '+g.note+'</div>':''}</div></details>`;
+        }).join('');
+        html+=`<details style="margin-bottom:10px;border:1.5px solid rgba(123,63,160,0.2);border-radius:var(--r2);overflow:hidden"><summary style="padding:10px 14px;cursor:pointer;background:linear-gradient(135deg,var(--violet-pale),var(--rose-pale));list-style:none;display:flex;align-items:center;justify-content:space-between;user-select:none"><div><div style="font-weight:600;font-size:13px">${s.nome} <span style="font-size:10px;font-weight:500;background:var(--violet);color:#fff;border-radius:10px;padding:1px 8px;margin-left:4px">${srifLabel}</span></div><div style="font-size:11px;color:var(--text3)">${s.weeks||4} sett. · ${giorniArr.length} giorni · ${giorniArr.reduce((tot,g)=>tot+(g.esercizi||[]).length,0)} esercizi</div></div><div style="display:flex;align-items:center;gap:8px"><button class="btn-ghost" style="font-size:11px;padding:4px 8px" onclick="event.preventDefault();event.stopPropagation();printSchedaData(${JSON.stringify(s).replace(/`/g,'\`')},'${nome}')">🖨️</button><span style="font-size:12px;color:var(--text3)">▼</span></div></summary><div style="padding:10px 14px;background:var(--bg2)">${giorniHtml}${s.note_globali?'<div style="font-size:11px;color:var(--text2);margin-top:8px;padding:8px;border-radius:var(--r);background:var(--warm)">📋 '+s.note_globali+'</div>':''}</div></details>`;
+      });
     }
     else html+=`<div style="font-size:13px;color:var(--text3);font-style:italic">Nessuna scheda assegnata</div>`;
     html+='</div>';
