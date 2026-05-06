@@ -784,6 +784,7 @@ input,textarea,select{font-family:'DM Sans',sans-serif}
               <div class="card-title" style="margin-bottom:14px">Struttura giorni</div>
               <div id="days-container"></div>
               <button class="btn-add-day" onclick="addDay()">+ Aggiungi giorno</button>
+              <button class="btn-add-day" id="btn-paste-day" style="display:none;border-color:rgba(232,82,122,0.4);color:var(--rose)" onclick="pasteCopiedDay()">📋 Incolla giorno copiato: <span id="paste-day-label"></span></button>
               <div id="editing-banner" style="display:none;background:linear-gradient(135deg,var(--violet-pale),var(--rose-pale));border:1.5px solid rgba(123,63,160,0.3);border-radius:var(--r);padding:8px 12px;margin-top:10px;font-size:12px;color:var(--violet);font-weight:600">✏️ Stai modificando una scheda esistente — salva per aggiornare</div>
               <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
                 <button class="btn-ghost" style="flex:1" onclick="saveDraftScheda()">🗒️ Bozza</button>
@@ -2458,37 +2459,44 @@ async function addDay(){
   </div>
   <div class="field" style="margin-bottom:8px"><label>Note coach</label><textarea class="db-note" placeholder="Indicazioni specifiche per questa sessione..." style="height:50px;background:var(--warm);border:1.5px solid var(--border);border-radius:var(--r);padding:7px 12px;color:var(--text);font-size:13px;outline:none;resize:vertical;width:100%"></textarea></div>
   <div class="db-exs"></div>
-  <div style="display:flex;gap:6px;margin-top:4px"><button class="btn-add-ex" style="flex:1" onclick="addExBuilder(this)">+ Aggiungi esercizio</button><button class="btn-ghost" style="font-size:11px;padding:6px 10px;white-space:nowrap" onclick="copyDay(this.closest('.day-builder'))">📋 Duplica giorno</button></div>`;
+  <div style="display:flex;gap:6px;margin-top:4px"><button class="btn-add-ex" style="flex:1" onclick="addExBuilder(this)">+ Aggiungi esercizio</button><button class="btn-ghost" style="font-size:11px;padding:6px 10px;white-space:nowrap" onclick="copyDayToClipboard(this.closest('.day-builder'))">📋 Copia giorno</button></div>`;
   document.getElementById('days-container').appendChild(div);
 }
-async function copyDay(srcDiv){
-  // Legge i valori dal giorno sorgente
-  const label=srcDiv.querySelector('.db-label')?.value||'';
-  const nome=srcDiv.querySelector('.db-nome')?.value||'';
-  const tipo=srcDiv.querySelector('.db-tipo')?.value||'allenamento';
-  const note=srcDiv.querySelector('.db-note')?.value||'';
-  const esercizi=[...srcDiv.querySelectorAll('.ex-builder')].map(ex=>({
-    name:ex.querySelector('.eb-name')?.value||'',
-    sets:ex.querySelector('.eb-sets')?.value||'3',
-    reps:ex.querySelector('.eb-reps')?.value||'10-12',
-    recupero:ex.querySelector('.eb-rec')?.value||'90s',
-    rpe:ex.querySelector('.eb-rpe')?.value||'',
-    rir:ex.querySelector('.eb-rir')?.value||'',
-    tipoGruppo:ex.querySelector('.eb-tipo-gruppo')?.value||'',
-    gruppo:ex.querySelector('.eb-gruppo')?.value||'',
-    note:ex.querySelector('.eb-note')?.value||''
-  }));
-  // Crea un nuovo giorno
+function copyDayToClipboard(srcDiv){
+  window._copiedDay={
+    label:srcDiv.querySelector('.db-label')?.value||'',
+    nome:srcDiv.querySelector('.db-nome')?.value||'',
+    tipo:srcDiv.querySelector('.db-tipo')?.value||'allenamento',
+    note:srcDiv.querySelector('.db-note')?.value||'',
+    esercizi:[...srcDiv.querySelectorAll('.ex-builder')].map(ex=>({
+      name:ex.querySelector('.eb-name')?.value||'',
+      sets:ex.querySelector('.eb-sets')?.value||'3',
+      reps:ex.querySelector('.eb-reps')?.value||'10-12',
+      recupero:ex.querySelector('.eb-rec')?.value||'90s',
+      rpe:ex.querySelector('.eb-rpe')?.value||'',
+      rir:ex.querySelector('.eb-rir')?.value||'',
+      tipoGruppo:ex.querySelector('.eb-tipo-gruppo')?.value||'',
+      gruppo:ex.querySelector('.eb-gruppo')?.value||'',
+      note:ex.querySelector('.eb-note')?.value||''
+    })).filter(e=>e.name)
+  };
+  const label=window._copiedDay.label||window._copiedDay.nome||'Giorno';
+  const btn=document.getElementById('btn-paste-day');
+  const lbl=document.getElementById('paste-day-label');
+  if(btn){btn.style.display='';}
+  if(lbl){lbl.textContent=label;}
+  toast(`📋 "${label}" copiato — ora vai alla settimana target e clicca "Incolla giorno copiato"`);
+}
+async function pasteCopiedDay(){
+  const d=window._copiedDay;if(!d){toast('Nessun giorno copiato');return;}
   await addDay();
   const newDiv=document.getElementById('days-container').lastElementChild;
-  const lbl=newDiv.querySelector('.db-label');if(lbl)lbl.value=label+' (copia)';
-  const nom=newDiv.querySelector('.db-nome');if(nom)nom.value=nome;
-  const tip=newDiv.querySelector('.db-tipo');if(tip)tip.value=tipo;
-  const not=newDiv.querySelector('.db-note');if(not)not.value=note;
-  // Aggiunge gli esercizi copiati
+  const lbl=newDiv.querySelector('.db-label');if(lbl)lbl.value=d.label;
+  const nom=newDiv.querySelector('.db-nome');if(nom)nom.value=d.nome;
+  const tip=newDiv.querySelector('.db-tipo');if(tip)tip.value=d.tipo;
+  const not=newDiv.querySelector('.db-note');if(not)not.value=d.note;
   const addBtn=newDiv.querySelector('.btn-add-ex');
-  for(const ex of esercizi){
-    if(!ex.name)continue;
+  for(const ex of d.esercizi){
     addExBuilder(addBtn);
     const exEls=newDiv.querySelectorAll('.ex-builder');
     const exEl=exEls[exEls.length-1];
@@ -2505,10 +2513,11 @@ async function copyDay(srcDiv){
     }
   }
   newDiv.scrollIntoView({behavior:'smooth',block:'start'});
-  toast('📋 Giorno duplicato!');
+  toast('✅ Giorno incollato!');
 }
+async function copyDay(srcDiv){} // legacy stub
 async function addExBuilder(btn){
-  const c=btn.previousElementSibling;const div=document.createElement('div');div.className='ex-builder';
+  const c=btn.closest('.day-builder').querySelector('.db-exs');const div=document.createElement('div');div.className='ex-builder';
   div.innerHTML=`<div class="ex-builder-row">
     <div class="field" style="flex:2;min-width:120px"><label>Esercizio</label><div style="position:relative"><input type="text" class="eb-name" placeholder="Nome esercizio" list="ex-datalist" oninput="checkExVideo(this)"><span class="eb-vid-dot" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);font-size:13px;cursor:default;pointer-events:none" title="Nessun video">⚪</span></div></div>
     <div class="field" style="max-width:55px"><label>Serie</label><input type="number" class="eb-sets" value="3" min="1" style="background:var(--warm);border:1.5px solid var(--border);border-radius:var(--r);padding:7px 6px;color:var(--text);font-size:13px;outline:none;text-align:center"></div>
