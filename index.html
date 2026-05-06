@@ -1372,8 +1372,12 @@ async function loadUserData(){
         const s=chosen;
         window._currentSchedaId=s.id;
         const cachedSchedaId=localStorage.getItem('asfc4_scheda_id_'+(user?.id||''));
-        if(cachedSchedaId && cachedSchedaId!==s.id){localStorage.removeItem('asfc4_nextDay_'+(user?.id||''));localStorage.removeItem('asfc4_nextSchedaId_'+(user?.id||''));console.log('[SCHEDA] Nuova scheda rilevata, reset giorno cache');}
-        if(!cachedSchedaId){localStorage.removeItem('asfc4_nextDay_'+(user?.id||''));localStorage.removeItem('asfc4_nextSchedaId_'+(user?.id||''));}
+        const isNewScheda=!cachedSchedaId||(cachedSchedaId!==s.id);
+        if(isNewScheda){
+          localStorage.setItem('asfc4_nextDay_'+(user?.id||''),'0');
+          localStorage.removeItem('asfc4_nextSchedaId_'+(user?.id||''));
+          window._nextWorkoutIdx=0;
+        }
         localStorage.setItem('asfc4_scheda_id_'+(user?.id||''), s.id);
         currentMeso={nome:s.nome,weeks:s.weeks||4,currentWeek:currentWeekNum,startDate:s.start_date||'',noteGlobali:s.note_globali||'',giorni:parseGiorni(s.giorni)};
       } else {
@@ -1726,8 +1730,9 @@ async function renderDayContentInto(idx, el){
     const esercizi=g.esercizi||[];
     // Raggruppa esercizi per gruppo (superset/triset/circuito)
     const tipoLabel={superset:'Superset',triset:'Triset',circuit:'Circuito'};
-    const tipoColor={superset:'rgba(123,63,160,0.12)',triset:'rgba(232,82,122,0.10)',circuit:'rgba(255,140,80,0.12)'};
-    const tipoBorder={superset:'rgba(123,63,160,0.35)',triset:'rgba(232,82,122,0.3)',circuit:'rgba(255,140,80,0.4)'};
+    const tipoColor={superset:'rgba(123,63,160,0.22)',triset:'rgba(232,82,122,0.18)',circuit:'rgba(255,140,80,0.22)'};
+    const tipoBorder={superset:'rgba(123,63,160,0.6)',triset:'rgba(232,82,122,0.55)',circuit:'rgba(255,140,80,0.65)'};
+    const tipoCardBg={superset:'rgba(123,63,160,0.06)',triset:'rgba(232,82,122,0.05)',circuit:'rgba(255,140,80,0.06)'};
     let html='';let i=0;
     while(i<esercizi.length){
       const ex=esercizi[i];
@@ -2613,11 +2618,55 @@ async function renderSchedeList(){
           <div style="display:flex;gap:6px;align-items:center">
             <span class="badge badge-green">Attiva</span>
             <button class="btn-sm" style="margin-left:auto" onclick="loadSchedaInBuilder('${s.id}')">✏️ Modifica</button>
+            <button class="btn-sm" onclick="duplicaScheda('${s.id}')">📋 Duplica</button>
             <button class="btn-danger" onclick="delScheda('${s.id}',${s._i})">Elimina</button>
           </div>
         </div>`).join('')}
       </div>
     </details>`).join('');
+}
+async function duplicaScheda(id){
+  const {data}=await supa.from('schede').select('*').eq('id',id).maybeSingle();
+  if(!data){toast('❌ Scheda non trovata');return;}
+  navigate('admin-schede');
+  await new Promise(r=>setTimeout(r,250));
+  document.getElementById('s-nome').value=data.nome+' (copia)';
+  const cl=document.getElementById('s-cliente');if(cl&&data.cliente_id)cl.value=data.cliente_id;
+  document.getElementById('s-weeks').value=String(data.weeks||4);
+  const si=document.getElementById('s-start');if(si)si.value='';
+  document.getElementById('s-note-globali').value=data.note_globali||'';
+  const sr=document.getElementById('s-settimana-rif');if(sr)sr.value='0';
+  const giorniArr=parseGiorni(data.giorni);
+  document.getElementById('days-container').innerHTML='';dayCount=0;
+  for(const g of giorniArr){
+    await addDay();
+    const dayEl=document.getElementById('days-container').lastElementChild;
+    if(!dayEl)continue;
+    const lbl=dayEl.querySelector('.db-label');if(lbl)lbl.value=g.label||'';
+    const nom=dayEl.querySelector('.db-nome');if(nom)nom.value=g.nome||'';
+    const tip=dayEl.querySelector('.db-tipo');if(tip)tip.value=g.tipo||'allenamento';
+    const not=dayEl.querySelector('.db-note');if(not)not.value=g.note||'';
+    const addBtn=dayEl.querySelector('.btn-add-ex');
+    for(const ex of (g.esercizi||[])){
+      addExBuilder(addBtn);
+      const exEls=dayEl.querySelectorAll('.ex-builder');
+      const exEl=exEls[exEls.length-1];
+      if(!exEl)continue;
+      const ni=exEl.querySelector('.eb-name');if(ni){ni.value=ex.name||'';checkExVideo(ni);}
+      exEl.querySelector('.eb-sets').value=ex.sets||3;
+      exEl.querySelector('.eb-reps').value=ex.reps||'10';
+      exEl.querySelector('.eb-rec').value=ex.recupero||'90s';
+      exEl.querySelector('.eb-rpe').value=ex.rpe??'';
+      exEl.querySelector('.eb-rir').value=ex.rir??'';
+      const tg=exEl.querySelector('.eb-tipo-gruppo');if(tg)tg.value=ex.tipoGruppo||'';
+      const gr=exEl.querySelector('.eb-gruppo');if(gr)gr.value=ex.gruppo||'';
+      exEl.querySelector('.eb-note').value=ex.note||'';
+    }
+  }
+  editingSchedaId=null;
+  const b=document.getElementById('editing-banner');if(b)b.style.display='none';
+  const btn=document.getElementById('btn-save-scheda');if(btn)btn.textContent='💾 Salva e assegna';
+  toast('📋 Scheda duplicata nel builder — modifica la settimana e salva');
 }
 async function delScheda(id,i){
   if(!confirm('Sicura di voler eliminare questa scheda? L\'operazione non è reversibile.'))return;
