@@ -2542,6 +2542,8 @@ async function renderSchedeList(){
     if(!byCliente[key])byCliente[key]={name:cl?.name||'Cliente sconosciuta',schede:[]};
     byCliente[key].schede.push({...s,_i:i});
   });
+  // Ordina le schede di ogni cliente per settimana_rif crescente (0=generale alla fine)
+  Object.values(byCliente).forEach(({schede})=>schede.sort((a,b)=>(a.settimana_rif||999)-(b.settimana_rif||999)));
   document.getElementById('schede-list').innerHTML=Object.entries(byCliente).map(([cid,{name,schede}])=>`
     <details style="border:1.5px solid var(--border);border-radius:var(--r2);margin-bottom:8px;overflow:hidden" open>
       <summary style="padding:10px 14px;cursor:pointer;background:var(--warm);list-style:none;display:flex;align-items:center;justify-content:space-between;user-select:none">
