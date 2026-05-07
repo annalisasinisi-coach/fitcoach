@@ -784,7 +784,6 @@ input,textarea,select{font-family:'DM Sans',sans-serif}
               <div class="card-title" style="margin-bottom:14px">Struttura giorni</div>
               <div id="days-container"></div>
               <button class="btn-add-day" onclick="addDay()">+ Aggiungi giorno</button>
-              <button class="btn-add-day" id="btn-paste-day" style="display:none;border-color:rgba(232,82,122,0.4);color:var(--rose)" onclick="pasteCopiedDay()">📋 Incolla giorno copiato: <span id="paste-day-label"></span></button>
               <div id="editing-banner" style="display:none;background:linear-gradient(135deg,var(--violet-pale),var(--rose-pale));border:1.5px solid rgba(123,63,160,0.3);border-radius:var(--r);padding:8px 12px;margin-top:10px;font-size:12px;color:var(--violet);font-weight:600">✏️ Stai modificando una scheda esistente — salva per aggiornare</div>
               <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
                 <button class="btn-ghost" style="flex:1" onclick="saveDraftScheda()">🗒️ Bozza</button>
@@ -1375,6 +1374,7 @@ async function loadUserData(){
         const isNewScheda=!cachedSchedaId||(cachedSchedaId!==s.id);
         if(isNewScheda){
           localStorage.setItem('asfc4_nextDay_'+(user?.id||''),'0');
+          localStorage.setItem('asfc4_fresh_scheda_'+(user?.id||''),'1'); // flag dedicato: forza giorno 0
           localStorage.removeItem('asfc4_nextSchedaId_'+(user?.id||''));
           window._nextWorkoutIdx=0;
         }
@@ -1588,6 +1588,13 @@ async function renderHome(){
     const giorni=nextScheda?parseGiorni(nextScheda.giorni):currentMeso.giorni;
     let nextIdx=0;
     try{
+      // Flag dedicato: nuova scheda assegnata → sempre giorno 0
+      const freshFlag=localStorage.getItem('asfc4_fresh_scheda_'+(user?.id||''));
+      if(freshFlag==='1'){
+        nextIdx=0;
+        localStorage.removeItem('asfc4_fresh_scheda_'+(user?.id||''));
+        localStorage.setItem('asfc4_nextDay_'+(user?.id||''),'0');
+      } else {
       const cached=localStorage.getItem('asfc4_nextDay_'+(user?.id||''));
       if(cached!==null){
         nextIdx=parseInt(cached)||0;
@@ -1601,6 +1608,7 @@ async function renderHome(){
           }
           localStorage.setItem('asfc4_nextDay_'+(user?.id||''), String(nextIdx));
         }
+      }
       }
     }catch(e){console.warn('nextWorkout:',e);}
     window._nextWorkoutIdx=nextIdx;
@@ -2464,63 +2472,9 @@ async function addDay(){
   </div>
   <div class="field" style="margin-bottom:8px"><label>Note coach</label><textarea class="db-note" placeholder="Indicazioni specifiche per questa sessione..." style="height:50px;background:var(--warm);border:1.5px solid var(--border);border-radius:var(--r);padding:7px 12px;color:var(--text);font-size:13px;outline:none;resize:vertical;width:100%"></textarea></div>
   <div class="db-exs"></div>
-  <div style="display:flex;gap:6px;margin-top:4px"><button class="btn-add-ex" style="flex:1" onclick="addExBuilder(this)">+ Aggiungi esercizio</button><button class="btn-ghost" style="font-size:11px;padding:6px 10px;white-space:nowrap" onclick="copyDayToClipboard(this.closest('.day-builder'))">📋 Copia giorno</button></div>`;
+  <div style="display:flex;gap:6px;margin-top:4px"><button class="btn-add-ex" style="flex:1" onclick="addExBuilder(this)">+ Aggiungi esercizio</button></div>`;
   document.getElementById('days-container').appendChild(div);
 }
-function copyDayToClipboard(srcDiv){
-  window._copiedDay={
-    label:srcDiv.querySelector('.db-label')?.value||'',
-    nome:srcDiv.querySelector('.db-nome')?.value||'',
-    tipo:srcDiv.querySelector('.db-tipo')?.value||'allenamento',
-    note:srcDiv.querySelector('.db-note')?.value||'',
-    esercizi:[...srcDiv.querySelectorAll('.ex-builder')].map(ex=>({
-      name:ex.querySelector('.eb-name')?.value||'',
-      sets:ex.querySelector('.eb-sets')?.value||'3',
-      reps:ex.querySelector('.eb-reps')?.value||'10-12',
-      recupero:ex.querySelector('.eb-rec')?.value||'90s',
-      rpe:ex.querySelector('.eb-rpe')?.value||'',
-      rir:ex.querySelector('.eb-rir')?.value||'',
-      tipoGruppo:ex.querySelector('.eb-tipo-gruppo')?.value||'',
-      gruppo:ex.querySelector('.eb-gruppo')?.value||'',
-      note:ex.querySelector('.eb-note')?.value||''
-    })).filter(e=>e.name)
-  };
-  const label=window._copiedDay.label||window._copiedDay.nome||'Giorno';
-  const btn=document.getElementById('btn-paste-day');
-  const lbl=document.getElementById('paste-day-label');
-  if(btn){btn.style.display='';}
-  if(lbl){lbl.textContent=label;}
-  toast(`📋 "${label}" copiato — ora vai alla settimana target e clicca "Incolla giorno copiato"`);
-}
-async function pasteCopiedDay(){
-  const d=window._copiedDay;if(!d){toast('Nessun giorno copiato');return;}
-  await addDay();
-  const newDiv=document.getElementById('days-container').lastElementChild;
-  const lbl=newDiv.querySelector('.db-label');if(lbl)lbl.value=d.label;
-  const nom=newDiv.querySelector('.db-nome');if(nom)nom.value=d.nome;
-  const tip=newDiv.querySelector('.db-tipo');if(tip)tip.value=d.tipo;
-  const not=newDiv.querySelector('.db-note');if(not)not.value=d.note;
-  const addBtn=newDiv.querySelector('.btn-add-ex');
-  for(const ex of d.esercizi){
-    addExBuilder(addBtn);
-    const exEls=newDiv.querySelectorAll('.ex-builder');
-    const exEl=exEls[exEls.length-1];
-    if(exEl){
-      const ni=exEl.querySelector('.eb-name');if(ni){ni.value=ex.name;checkExVideo(ni);}
-      exEl.querySelector('.eb-sets').value=ex.sets;
-      exEl.querySelector('.eb-reps').value=ex.reps;
-      exEl.querySelector('.eb-rec').value=ex.recupero;
-      exEl.querySelector('.eb-rpe').value=ex.rpe;
-      exEl.querySelector('.eb-rir').value=ex.rir;
-      const tg=exEl.querySelector('.eb-tipo-gruppo');if(tg)tg.value=ex.tipoGruppo;
-      const gr=exEl.querySelector('.eb-gruppo');if(gr)gr.value=ex.gruppo;
-      exEl.querySelector('.eb-note').value=ex.note;
-    }
-  }
-  newDiv.scrollIntoView({behavior:'smooth',block:'start'});
-  toast('✅ Giorno incollato!');
-}
-async function copyDay(srcDiv){} // legacy stub
 async function addExBuilder(btn){
   const c=btn.closest('.day-builder').querySelector('.db-exs');const div=document.createElement('div');div.className='ex-builder';
   div.innerHTML=`<div class="ex-builder-row">
@@ -2776,24 +2730,30 @@ async function saveSchedaTemplate(){
   const noteGlobali=document.getElementById('s-note-globali').value;
   const giorni=collectGiorni();
   if(!giorni.length){toast('❌ Aggiungi almeno un giorno');return;}
-  // Save as scheda with cliente_id = null and is_template = true
-  const {data,error}=await supa.from('schede').insert({
-    nome,coach_id:user.id,weeks,note_globali:noteGlobali,giorni,
-    attiva:false,cliente_id:null,is_template:true
-  }).select('id');
-  if(error){
-    // is_template column may not exist — fall back to saving without it
-    const {error:e2}=await supa.from('schede').insert({
+  if(editingSchedaId){
+    // Aggiorna template esistente
+    const {error}=await supa.from('schede').update({nome,weeks,note_globali:noteGlobali,giorni}).eq('id',editingSchedaId);
+    if(error){toast('❌ Errore aggiornamento: '+error.message);return;}
+    toast(`📁 Template "${nome}" aggiornato!`);
+  } else {
+    // Crea nuovo template
+    const {data,error}=await supa.from('schede').insert({
       nome,coach_id:user.id,weeks,note_globali:noteGlobali,giorni,
-      attiva:false,cliente_id:null
-    });
-    if(e2){toast('❌ Errore: '+e2.message);return;}
+      attiva:false,cliente_id:null,is_template:true
+    }).select('id');
+    if(error){
+      const {error:e2}=await supa.from('schede').insert({
+        nome,coach_id:user.id,weeks,note_globali:noteGlobali,giorni,
+        attiva:false,cliente_id:null
+      });
+      if(e2){toast('❌ Errore: '+e2.message);return;}
+    }
+    toast(`📁 Template "${nome}" salvato!`);
   }
   document.getElementById('s-nome').value='';
   document.getElementById('days-container').innerHTML='';
   dayCount=0;addDay();
-  renderTemplatesList();
-  toast(`📁 Template "${nome}" salvato!`);
+  resetBuilder();renderTemplatesList();
 }
 async function renderTemplatesList(){
   const el=document.getElementById('templates-list');if(!el)return;
