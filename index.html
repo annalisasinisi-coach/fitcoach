@@ -546,7 +546,7 @@ input,textarea,select{font-family:'DM Sans',sans-serif}
           <div class="card-title">📊 Volume per gruppo muscolare</div>
           <div style="display:flex;gap:8px;margin:8px 0 12px;flex-wrap:wrap">
             <button id="vol-btn-day" class="btn-sm" onclick="switchVolView('day')" style="background:var(--violet);color:#fff;border:none">Giorno corrente</button>
-            <button id="vol-btn-week" class="btn-ghost" onclick="switchVolView('week')">Settimana completa</button>
+            <button id="vol-btn-week" class="btn-ghost" onclick="switchVolView('week')">Scheda intera</button>
           </div>
           <div style="font-size:11px;color:var(--text3);margin-bottom:8px" id="vol-subtitle"></div>
           <div class="chart-wrap"><canvas id="volChart"></canvas></div>
@@ -1804,16 +1804,11 @@ function switchVolView(v){
   if(wb){wb.style.cssText=v==='week'?'background:var(--violet);color:#fff;border:none':'';wb.className=v==='week'?'btn-sm':'btn-ghost';}
   renderVolumeChart(currentDay);
 }
-function renderVolumeChart(dayIdx){
+function renderVolumeChart(dayIdx,overrideGiorni){
   const card=document.getElementById('volume-chart-card');if(!card)return;
-  const giorni=currentMeso.giorni||[];if(!giorni.length){card.style.display='none';return;}
-  let srcGiorni;
-  if(_volView==='week'){
-    srcGiorni=(window._allSchede||[]).flatMap(s=>parseGiorni(s.giorni));
-    if(!srcGiorni.length)srcGiorni=giorni;
-  } else {
-    srcGiorni=giorni[dayIdx]?[giorni[dayIdx]]:[];
-  }
+  const giorni=overrideGiorni||currentMeso.giorni||[];if(!giorni.length){card.style.display='none';return;}
+  // "Scheda intera" usa tutti i giorni della scheda corrente — NON tutte le schede della settimana
+  const srcGiorni=_volView==='week'?giorni:(giorni[dayIdx]?[giorni[dayIdx]]:[]);
   const vol=calcVolume(srcGiorni);
   const labels=Object.keys(vol).filter(k=>vol[k].serie>0);
   if(!labels.length){card.style.display='none';return;}
@@ -1821,7 +1816,7 @@ function renderVolumeChart(dayIdx){
   const g=giorni[dayIdx];
   document.getElementById('vol-subtitle').textContent=_volView==='day'
     ?`${g?.label||''}${g?.nome?' — '+g.nome:''}  ·  Dettaglio esercizi del giorno corrente`
-    :'Tutti i giorni di allenamento della settimana cumulati';
+    :`Tutti i giorni della scheda "${currentMeso.nome||''}"`;
   const totSerie=labels.reduce((s,k)=>s+vol[k].serie,0);
   const totRip=labels.reduce((s,k)=>s+vol[k].rip,0);
   document.getElementById('vol-total').textContent=`Totale: ${totSerie} serie · ~${totRip} ripetizioni`;
@@ -3817,6 +3812,26 @@ async function viewClient(clientId, clientName){
     }
     else html+=`<div style="font-size:13px;color:var(--text3);font-style:italic">Nessuna scheda assegnata</div>`;
     html+='</div>';
+    // Volume per gruppo muscolare per ogni scheda (solo se ci sono schede)
+    if(_schedeOrd.length){
+      html+=`<div style="margin-bottom:18px"><div style="font-size:11px;text-transform:uppercase;letter-spacing:0.06em;color:var(--text3);font-weight:600;margin-bottom:8px">📊 VOLUME PER GRUPPO MUSCOLARE</div>`;
+      _schedeOrd.forEach(s=>{
+        const srifLabel=s._srif>0?'Settimana '+s._srif:'Generale';
+        const giorniArr=parseGiorni(s.giorni);
+        const vol=calcVolume(giorniArr);
+        const vlabels=Object.keys(vol).filter(k=>vol[k].serie>0);
+        if(!vlabels.length)return;
+        const totS=vlabels.reduce((a,k)=>a+vol[k].serie,0);
+        const totR=vlabels.reduce((a,k)=>a+vol[k].rip,0);
+        const colors=['#7B3FA0','#E8527A','#FF8C50','#5AAA7A','#5088C8','#B48230','#A064B4','#64B4A0'];
+        html+=`<div style="margin-bottom:14px;padding:12px;background:var(--bg2);border-radius:var(--r2);border:1px solid var(--border)">
+          <div style="font-size:12px;font-weight:600;margin-bottom:2px">${s.nome} <span style="font-size:10px;color:var(--text3)">(${srifLabel})</span></div>
+          <div style="font-size:11px;color:var(--text3);margin-bottom:8px">Totale scheda: ${totS} serie · ~${totR} rip. · ${giorniArr.filter(g=>g.tipo!=='riposo').length} giorni</div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px">${vlabels.map((k,i)=>`<div style="background:var(--warm);border-radius:6px;padding:6px 10px;min-width:100px;border-left:3px solid ${colors[i%colors.length]}"><div style="font-size:10px;font-weight:700;color:${colors[i%colors.length]}">${k}</div><div style="font-size:13px;font-weight:800;color:var(--text)">${vol[k].serie} serie</div><div style="font-size:10px;color:var(--text3)">~${vol[k].rip} rip.</div></div>`).join('')}</div>
+        </div>`;
+      });
+      html+=`</div>`;
+    }
     // Check-in — collapsibili per data
     html+=`<details style="margin-bottom:16px;border:1.5px solid var(--border);border-radius:var(--r2);overflow:hidden" open>
       <summary style="padding:10px 14px;cursor:pointer;background:var(--warm);font-size:11px;text-transform:uppercase;letter-spacing:0.06em;color:var(--text3);font-weight:600;list-style:none;display:flex;justify-content:space-between;align-items:center">
