@@ -385,7 +385,7 @@ input,textarea,select{font-family:'DM Sans',sans-serif}
   /* Day tabs */
   .day-tabs-wrap{overflow-x:auto}
   /* Builder inputs */
-  .eb-name,.eb-sets,.eb-reps,.eb-rec,.eb-rpe,.eb-rir,.eb-note{width:100%!important;min-width:0!important}
+  .eb-name,.eb-sets,.eb-reps,.eb-rec,.eb-rpe,.eb-tecnica,.eb-note{width:100%!important;min-width:0!important}
   /* Piano macro edit */
   .macro-edit-field input{font-size:16px;width:100%}
   /* Macro ring cards: 2 per row */
@@ -782,6 +782,9 @@ input,textarea,select{font-family:'DM Sans',sans-serif}
             </div>
             <div style="background:#fff;border:1.5px solid var(--border);border-radius:var(--r2);padding:18px;box-shadow:var(--shadow)">
               <div class="card-title" style="margin-bottom:14px">Struttura giorni</div>
+              <datalist id="tecnica-list">
+                <option value="Ramping"><option value="Drop Set"><option value="Stripping"><option value="Burns"><option value="Rest pause"><option value="Myo reps"><option value="Ladder"><option value="Muscle round"><option value="Serie interrotta"><option value="1 rep e mezza"><option value="Triple pulse"><option value="Picco contrazione"><option value="Mod. 21">
+              </datalist>
               <div id="days-container"></div>
               <button class="btn-add-day" onclick="addDay()">+ Aggiungi giorno</button>
               <div id="editing-banner" style="display:none;background:linear-gradient(135deg,var(--violet-pale),var(--rose-pale));border:1.5px solid rgba(123,63,160,0.3);border-radius:var(--r);padding:8px 12px;margin-top:10px;font-size:12px;color:var(--violet);font-weight:600">✏️ Stai modificando una scheda esistente — salva per aggiornare</div>
@@ -1135,6 +1138,7 @@ const CHECK_QUESTIONS=[
   {id:'difficolta_esercizio',type:'textarea',q:'Hai incontrato difficoltà in qualche esercizio?'},
   {id:'correzioni',type:'textarea',q:'Dove hai ricevuto più correzioni?'},
   {id:'note_allenamento',type:'textarea',q:'Se vuoi aggiungere qualcosa riguardo l\'allenamento, scrivilo qui'},
+  {id:'passi_giornalieri',type:'text',q:'Stima dei passi giornalieri (dall\'app contapassi del tuo smartphone)'},
   {id:'alimentazione',type:'textarea',q:'Com\'è andata l\'alimentazione questo mese?'},
   {id:'fame',type:'radio',q:'Hai avuto troppa o troppa poca fame?',opts:['Giusta','Troppa','Troppo poca']},
   {id:'idratazione',type:'radio',q:'Ti stai mantenendo idratata bevendo abbastanza acqua?',opts:['Sì','No, devo migliorare']},
@@ -1763,7 +1767,7 @@ async function renderDayContentInto(idx, el){
             html+=`<div class="ex-card ${done?'completed':''}" id="card_ex_${idx}_${gi}" style="border-radius:0;border-top:1px solid ${tipoBorder[gex.tipoGruppo]||'var(--border)'}">
               <div class="ex-top"><div class="ex-video-col">${videoHTML}</div><div class="ex-info-col">
                 <div class="ex-hrow"><div class="ex-num">${gi+1}</div><div class="ex-name">${gex.name}</div><button class="ex-check-btn ${done?'done':''}" onclick="toggleEx('${key}',this,'card_ex_${idx}_${gi}')">${done?'✓':''}</button></div>
-                <div class="ex-meta">${gex.sets} serie × ${gex.reps} | Recupero: ${gex.recupero||'—'}${gex.rpe!=null?' | RPE: '+gex.rpe:''}${gex.rir!=null?' | RIR: '+gex.rir:''}</div>
+                <div class="ex-meta">${gex.sets} serie × ${gex.reps} | Recupero: ${gex.recupero||'—'}${gex.rpe!=null?' | RPE: '+gex.rpe:''}${gex.tecnica?' | '+gex.tecnica:''}</div>
                 ${libGex?.desc?`<div class="ex-note-inline">💡 ${libGex.desc}</div>`:''}${gex.note?`<div class="ex-note-inline">📌 ${gex.note}</div>`:''}
                 <div class="weight-row"><label>💪 Peso:</label><input class="weight-inp" type="number" id="w_${key}" step="0.5" placeholder="${lastKg||'kg'}" value="${lastKg}"><span style="font-size:12px;color:var(--text2)">kg</span><button class="btn-sm" onclick="saveWeight('${gex.name}','${key}')">Salva</button>${stored?`<button class="btn-ghost" onclick="navigate('progressi')">📈</button>`:''}</div>
               </div></div>
@@ -1783,7 +1787,7 @@ async function renderDayContentInto(idx, el){
         html+=`<div class="ex-card ${done?'completed':''}" id="card_${key}">
           <div class="ex-top"><div class="ex-video-col">${videoHTML}</div><div class="ex-info-col">
             <div class="ex-hrow"><div class="ex-num">${i+1}</div><div class="ex-name">${ex.name}</div><button class="ex-check-btn ${done?'done':''}" onclick="toggleEx('${key}',this,'card_${key}')">${done?'✓':''}</button></div>
-            <div class="ex-meta">${ex.sets} serie × ${ex.reps} | Recupero: ${ex.recupero||'—'}${ex.rpe!=null?' | RPE: '+ex.rpe:''}${ex.rir!=null?' | RIR: '+ex.rir:''}</div>
+            <div class="ex-meta">${ex.sets} serie × ${ex.reps} | Recupero: ${ex.recupero||'—'}${ex.rpe!=null?' | RPE: '+ex.rpe:''}${ex.tecnica?' | '+ex.tecnica:''}</div>
             ${libEx?.desc?`<div class="ex-note-inline">💡 ${libEx.desc}</div>`:''}${ex.note?`<div class="ex-note-inline">📌 ${ex.note}</div>`:''}
             <div style="flex:1"></div>
             <div class="weight-row"><label>💪 Peso:</label><input class="weight-inp" type="number" id="w_${key}" step="0.5" placeholder="${lastKg||'kg'}" value="${lastKg}"><span style="font-size:12px;color:var(--text2)">kg</span><button class="btn-sm" onclick="saveWeight('${ex.name}','${key}')">Salva</button>${stored?`<button class="btn-ghost" onclick="navigate('progressi')">📈</button>`:''}</div>
@@ -2239,12 +2243,12 @@ async function selectFreq(btn,id,val,prefix){btn.closest('.q-freq-group').queryS
 function renderAnamnesi(){
   const el=document.getElementById('anamnesi-container');
   if(!el)return;
-  el.innerHTML=ANAMNESI_QUESTIONS.map(q=>renderQBlock(q,anamnesiAnswers,'an')).join('');
+  el.innerHTML=ANAMNESI_QUESTIONS.map(q=>renderQBlock(q,anamnesiAnswers,'an')).join('')+`<div style="margin-top:20px;padding:16px;background:linear-gradient(135deg,rgba(232,82,122,0.10),rgba(248,221,230,0.55));border:2px solid rgba(232,82,122,0.30);border-radius:12px;font-size:13px;line-height:1.7;color:var(--text)">❤️&nbsp;<strong>Ricordati:</strong> inviami le <strong>fotografie</strong> (fronte, retro e laterali) su <strong>WhatsApp</strong> e carica <strong>peso e misure</strong> nell’apposita sezione dell’app.</div>`;
 }
 function renderCheckQ(){
   const el=document.getElementById('check-q-container');
   if(!el)return;
-  el.innerHTML=CHECK_QUESTIONS.map(q=>renderQBlock(q,checkAnswers,'ck')).join('');
+  el.innerHTML=CHECK_QUESTIONS.map(q=>renderQBlock(q,checkAnswers,'ck')).join('')+`<div style="margin-top:20px;padding:16px;background:linear-gradient(135deg,rgba(232,82,122,0.10),rgba(248,221,230,0.55));border:2px solid rgba(232,82,122,0.30);border-radius:12px;font-size:13px;line-height:1.7;color:var(--text)">❤️&nbsp;<strong>Ricordati:</strong> inviami le <strong>fotografie</strong> (fronte, retro e laterali) su <strong>WhatsApp</strong> e carica <strong>peso e misure aggiornati</strong> nell’apposita sezione dell’app.</div>`;
 }
 function collectAnswers(prefix,questions){
   // Answers are auto-saved to state on every interaction, just return the state
@@ -2483,7 +2487,7 @@ async function addExBuilder(btn){
     <div class="field" style="max-width:70px"><label>Rip.</label><input type="text" class="eb-reps" value="10-12" style="background:var(--warm);border:1.5px solid var(--border);border-radius:var(--r);padding:7px 6px;color:var(--text);font-size:13px;outline:none"></div>
     <div class="field" style="max-width:62px"><label>Recup.</label><input type="text" class="eb-rec" value="90s" style="background:var(--warm);border:1.5px solid var(--border);border-radius:var(--r);padding:7px 6px;color:var(--text);font-size:13px;outline:none"></div>
     <div class="field" style="max-width:55px"><label>RPE</label><input type="number" class="eb-rpe" min="1" max="10" placeholder="—" style="background:var(--warm);border:1.5px solid var(--border);border-radius:var(--r);padding:7px 6px;color:var(--text);font-size:13px;outline:none;text-align:center"></div>
-    <div class="field" style="max-width:55px"><label>RIR</label><input type="number" class="eb-rir" min="0" max="10" placeholder="—" style="background:var(--warm);border:1.5px solid var(--border);border-radius:var(--r);padding:7px 6px;color:var(--text);font-size:13px;outline:none;text-align:center"></div>
+    <div class="field" style="max-width:140px"><label>Tecnica</label><input type="text" class="eb-tecnica" placeholder="—" list="tecnica-list" style="background:var(--warm);border:1.5px solid var(--border);border-radius:var(--r);padding:7px 6px;color:var(--text);font-size:13px;outline:none"></div>
     <div class="field" style="max-width:90px"><label>Gruppo</label><select class="eb-tipo-gruppo" style="background:var(--warm);border:1.5px solid var(--border);border-radius:var(--r);padding:7px 5px;color:var(--text);font-size:12px;outline:none"><option value="">—</option><option value="superset">Superset</option><option value="triset">Triset</option><option value="circuit">Circuito</option></select></div>
     <div class="field" style="max-width:44px"><label>Lett.</label><input type="text" class="eb-gruppo" maxlength="2" placeholder="A" style="background:var(--warm);border:1.5px solid var(--border);border-radius:var(--r);padding:7px 6px;color:var(--text);font-size:13px;outline:none;text-align:center;text-transform:uppercase"></div>
     <div class="field" style="flex:2;min-width:100px"><label>Note</label><input type="text" class="eb-note" placeholder="Note tecniche..." style="background:var(--warm);border:1.5px solid var(--border);border-radius:var(--r);padding:7px 6px;color:var(--text);font-size:13px;outline:none"></div>
@@ -2611,7 +2615,7 @@ async function duplicaScheda(id){
       exEl.querySelector('.eb-reps').value=ex.reps||'10';
       exEl.querySelector('.eb-rec').value=ex.recupero||'90s';
       exEl.querySelector('.eb-rpe').value=ex.rpe??'';
-      exEl.querySelector('.eb-rir').value=ex.rir??'';
+      exEl.querySelector('.eb-tecnica').value=ex.tecnica||'';
       const tg=exEl.querySelector('.eb-tipo-gruppo');if(tg)tg.value=ex.tipoGruppo||'';
       const gr=exEl.querySelector('.eb-gruppo');if(gr)gr.value=ex.gruppo||'';
       exEl.querySelector('.eb-note').value=ex.note||'';
@@ -2688,7 +2692,7 @@ async function restoreDraft(){
           exEl.querySelector('.eb-reps').value=ex.reps||'10';
           exEl.querySelector('.eb-rec').value=ex.recupero||'90s';
           exEl.querySelector('.eb-rpe').value=ex.rpe??'';const _tg=exEl.querySelector('.eb-tipo-gruppo');if(_tg)_tg.value=ex.tipoGruppo||'';const _gr=exEl.querySelector('.eb-gruppo');if(_gr)_gr.value=ex.gruppo||'';
-          exEl.querySelector('.eb-rir').value=ex.rir??'';
+          exEl.querySelector('.eb-tecnica').value=ex.tecnica||'';
           exEl.querySelector('.eb-note').value=ex.note||'';
         }
       }
@@ -2716,8 +2720,8 @@ function collectGiorni(){
     d.querySelectorAll('.ex-builder').forEach(ex=>{
       const n=ex.querySelector('.eb-name')?.value?.trim();if(!n)return;
       const rpeVal=ex.querySelector('.eb-rpe')?.value;
-      const rirVal=ex.querySelector('.eb-rir')?.value;
-      esercizi.push({name:n,sets:parseInt(ex.querySelector('.eb-sets')?.value)||3,reps:ex.querySelector('.eb-reps')?.value||'10',recupero:ex.querySelector('.eb-rec')?.value||'90s',rpe:rpeVal!==''?parseInt(rpeVal):null,rir:rirVal!==''?parseInt(rirVal):null,note:ex.querySelector('.eb-note')?.value||'',gruppo:ex.querySelector('.eb-gruppo')?.value?.toUpperCase()||'',tipoGruppo:ex.querySelector('.eb-tipo-gruppo')?.value||''});
+      const tecnicaVal=ex.querySelector('.eb-tecnica')?.value?.trim()||'';
+      esercizi.push({name:n,sets:parseInt(ex.querySelector('.eb-sets')?.value)||3,reps:ex.querySelector('.eb-reps')?.value||'10',recupero:ex.querySelector('.eb-rec')?.value||'90s',rpe:rpeVal!==''?parseInt(rpeVal):null,tecnica:tecnicaVal,note:ex.querySelector('.eb-note')?.value||'',gruppo:ex.querySelector('.eb-gruppo')?.value?.toUpperCase()||'',tipoGruppo:ex.querySelector('.eb-tipo-gruppo')?.value||''});
     });
     giorni.push({label:d.querySelector('.db-label')?.value||'Giorno',nome:d.querySelector('.db-nome')?.value||'',tipo:d.querySelector('.db-tipo')?.value||'allenamento',note:d.querySelector('.db-note')?.value||'',esercizi});
   });
@@ -2820,7 +2824,7 @@ async function loadTemplate(id){
           exEl.querySelector('.eb-reps').value=ex.reps||'10';
           exEl.querySelector('.eb-rec').value=ex.recupero||'90s';
           exEl.querySelector('.eb-rpe').value=ex.rpe??'';const _tg=exEl.querySelector('.eb-tipo-gruppo');if(_tg)_tg.value=ex.tipoGruppo||'';const _gr=exEl.querySelector('.eb-gruppo');if(_gr)_gr.value=ex.gruppo||'';
-          exEl.querySelector('.eb-rir').value=ex.rir??'';
+          exEl.querySelector('.eb-tecnica').value=ex.tecnica||'';
           exEl.querySelector('.eb-note').value=ex.note||'';
         }
       }
@@ -2863,7 +2867,7 @@ async function loadSchedaInBuilder(id){
           exEl.querySelector('.eb-reps').value=ex.reps||'10';
           exEl.querySelector('.eb-rec').value=ex.recupero||'90s';
           exEl.querySelector('.eb-rpe').value=ex.rpe??'';
-          exEl.querySelector('.eb-rir').value=ex.rir??'';
+          exEl.querySelector('.eb-tecnica').value=ex.tecnica||'';
           exEl.querySelector('.eb-note').value=ex.note||'';
           const tg=exEl.querySelector('.eb-tipo-gruppo');if(tg)tg.value=ex.tipoGruppo||'';
           const gr=exEl.querySelector('.eb-gruppo');if(gr)gr.value=ex.gruppo||'';
@@ -3686,7 +3690,7 @@ async function viewClient(clientId, clientName){
         const giorniArr=parseGiorni(s.giorni);
         const giorniHtml=giorniArr.map((g,gi)=>{
           if(g.tipo==='riposo') return `<details style="margin-bottom:5px;border:1px solid var(--border);border-radius:var(--r);overflow:hidden"><summary style="padding:8px 12px;cursor:pointer;background:var(--warm);list-style:none;display:flex;align-items:center;gap:8px;user-select:none"><span style="font-size:11px;font-weight:700;background:var(--peach-pale);color:#C07040;padding:2px 8px;border-radius:10px">${g.label}</span><span style="font-size:12px;font-weight:600">${g.nome||'Riposo'}</span><span style="font-size:11px;color:var(--text3)">😴</span></summary><div style="padding:8px 12px;background:var(--bg2);font-size:12px;color:var(--text3);font-style:italic">${g.note||'Giornata di recupero'}</div></details>`;
-          const exHtml=(g.esercizi||[]).map((ex,ei)=>`<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border)"><div style="width:20px;height:20px;border-radius:50%;background:var(--rose-pale);color:var(--rose);font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">${ei+1}</div><div style="flex:1;min-width:0"><div style="font-size:12px;font-weight:600">${ex.name}${ex.gruppo?` <span style="font-size:10px;background:var(--violet-pale);color:var(--violet);padding:1px 5px;border-radius:6px">${ex.tipoGruppo||''} ${ex.gruppo}</span>`:''}</div><div style="font-size:11px;color:var(--text2)">${ex.sets}×${ex.reps} · Rec ${ex.recupero||'—'}${ex.rpe!=null?' · RPE '+ex.rpe:''}${ex.rir!=null?' · RIR '+ex.rir:''}</div></div></div>`).join('');
+          const exHtml=(g.esercizi||[]).map((ex,ei)=>`<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border)"><div style="width:20px;height:20px;border-radius:50%;background:var(--rose-pale);color:var(--rose);font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">${ei+1}</div><div style="flex:1;min-width:0"><div style="font-size:12px;font-weight:600">${ex.name}${ex.gruppo?` <span style="font-size:10px;background:var(--violet-pale);color:var(--violet);padding:1px 5px;border-radius:6px">${ex.tipoGruppo||''} ${ex.gruppo}</span>`:''}</div><div style="font-size:11px;color:var(--text2)">${ex.sets}×${ex.reps} · Rec ${ex.recupero||'—'}${ex.rpe!=null?' · RPE '+ex.rpe:''}${ex.tecnica?' · '+ex.tecnica:''}</div></div></div>`).join('');
           return `<details style="margin-bottom:5px;border:1px solid var(--border);border-radius:var(--r);overflow:hidden"><summary style="padding:8px 12px;cursor:pointer;background:var(--warm);list-style:none;display:flex;align-items:center;justify-content:space-between;user-select:none"><div style="display:flex;align-items:center;gap:8px"><span style="font-size:11px;font-weight:700;background:var(--rose-pale);color:var(--rose);padding:2px 8px;border-radius:10px">${g.label}</span><span style="font-size:12px;font-weight:600">${g.nome||''}</span></div><span style="font-size:11px;color:var(--text3)">${(g.esercizi||[]).length} es. ▼</span></summary><div style="padding:8px 12px;background:var(--bg2)">${exHtml}${g.note?'<div style="font-size:11px;color:var(--text2);margin-top:6px;padding-top:6px;border-top:1px solid var(--border)">📝 '+g.note+'</div>':''}</div></details>`;
         }).join('');
         html+=`<details style="margin-bottom:10px;border:1.5px solid rgba(123,63,160,0.2);border-radius:var(--r2);overflow:hidden"><summary style="padding:10px 14px;cursor:pointer;background:linear-gradient(135deg,var(--violet-pale),var(--rose-pale));list-style:none;display:flex;align-items:center;justify-content:space-between;user-select:none"><div><div style="font-weight:600;font-size:13px">${s.nome} <span style="font-size:10px;font-weight:500;background:var(--violet);color:#fff;border-radius:10px;padding:1px 8px;margin-left:4px">${srifLabel}</span></div><div style="font-size:11px;color:var(--text3)">${s.weeks||4} sett. · ${giorniArr.length} giorni · ${giorniArr.reduce((tot,g)=>tot+(g.esercizi||[]).length,0)} esercizi</div></div><div style="display:flex;align-items:center;gap:8px"><button class="btn-ghost" style="font-size:11px;padding:4px 8px" onclick="event.preventDefault();event.stopPropagation();printSchedaData(window._profiloSchedeMap['${s.id}'],'${nome}')">🖨️</button><span style="font-size:12px;color:var(--text3)">▼</span></div></summary><div style="padding:10px 14px;background:var(--bg2)">${giorniHtml}${s.note_globali?'<div style="font-size:11px;color:var(--text2);margin-top:8px;padding:8px;border-radius:var(--r);background:var(--warm)">📋 '+s.note_globali+'</div>':''}</div></details>`;
