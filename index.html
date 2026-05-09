@@ -736,6 +736,30 @@ input,textarea,select{font-family:'DM Sans',sans-serif}
       </div>
 
       <!-- RISORSE CLIENTE -->
+      <!-- CONSULENZA -->
+      <div class="page" id="page-consulenza">
+        <div class="page-title">📅 Prenota la tua chiamata</div>
+        <div class="page-sub">Sessione di consulenza con Annalisa</div>
+        <div class="card" style="text-align:center;padding:28px 20px">
+          <div style="font-size:52px;margin-bottom:12px">📞</div>
+          <div style="font-size:17px;font-weight:700;color:var(--text);margin-bottom:8px">Consulenza con Annalisa</div>
+          <div style="font-size:13px;color:var(--text2);line-height:1.7;margin-bottom:24px">Prenota la tua chiamata su Google Meet direttamente dal calendario di Annalisa. Scegli il giorno e l'orario che preferisci: riceverai una conferma via email con il link per entrare nella videochiamata.</div>
+          <a href="https://calendar.app.google/Cc9HzUUmKAJ7isfa6" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:10px;background:linear-gradient(135deg,var(--rose),var(--violet));color:#fff;text-decoration:none;border-radius:var(--r2);padding:14px 28px;font-size:15px;font-weight:700;box-shadow:0 4px 16px rgba(232,82,122,0.32);transition:var(--tr)">
+            <span style="font-size:20px">📅</span> Prenota ora
+          </a>
+          <div style="margin-top:20px;font-size:12px;color:var(--text3)">Verrai reindirizzata al calendario di Google.<br>Dopo la prenotazione riceverai un'email di conferma.</div>
+        </div>
+        <div class="card" style="margin-top:14px;padding:18px">
+          <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:10px">💡 Come funziona</div>
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <div style="display:flex;gap:12px;align-items:flex-start"><div style="width:24px;height:24px;border-radius:50%;background:var(--rose-pale);color:var(--rose);font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">1</div><div style="font-size:13px;color:var(--text2);line-height:1.6">Clicca "Prenota ora" e scegli giorno e orario disponibile</div></div>
+            <div style="display:flex;gap:12px;align-items:flex-start"><div style="width:24px;height:24px;border-radius:50%;background:var(--rose-pale);color:var(--rose);font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">2</div><div style="font-size:13px;color:var(--text2);line-height:1.6">Inserisci il tuo nome e la tua email per confermare</div></div>
+            <div style="display:flex;gap:12px;align-items:flex-start"><div style="width:24px;height:24px;border-radius:50%;background:var(--rose-pale);color:var(--rose);font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">3</div><div style="font-size:13px;color:var(--text2);line-height:1.6">Ricevi il link Google Meet via email e partecipa alla chiamata all'orario stabilito</div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- RISORSE -->
       <div class="page" id="page-risorse">
         <div class="page-title">📚 Risorse</div>
         <div class="page-sub">Guide, PDF e materiali da Annalisa</div>
@@ -1472,7 +1496,7 @@ async function loadUserData(){
 // ══════════════════════════════════
 // NAV
 // ══════════════════════════════════
-const NAV_C=[{id:'home',icon:'🏠',label:'Home'},{id:'allenamento',icon:'💪',label:'Allenamento'},{id:'progressi',icon:'📈',label:'Progressi'},{id:'checkin',icon:'📊',label:'Check-in mensile'},{id:'anamnesi',icon:'📋',label:'Anamnesi'},{id:'piano',icon:'🥗',label:'Piano alimentare'},{id:'risorse',icon:'📚',label:'Risorse'},{id:'chat',icon:'💬',label:'Chat coach'},{id:'profilo',icon:'👤',label:'Profilo'}];
+const NAV_C=[{id:'home',icon:'🏠',label:'Home'},{id:'allenamento',icon:'💪',label:'Allenamento'},{id:'progressi',icon:'📈',label:'Progressi'},{id:'checkin',icon:'📊',label:'Check-in mensile'},{id:'anamnesi',icon:'📋',label:'Anamnesi'},{id:'piano',icon:'🥗',label:'Piano alimentare'},{id:'consulenza',icon:'📅',label:'Prenota chiamata'},{id:'risorse',icon:'📚',label:'Risorse'},{id:'chat',icon:'💬',label:'Chat coach'},{id:'profilo',icon:'👤',label:'Profilo'}];
 const NAV_A=[{id:'admin-dashboard',icon:'🏠',label:'Dashboard',s:'Gestione'},{id:'admin-schede',icon:'📋',label:'Crea schede',s:''},{id:'admin-libreria',icon:'🏋️',label:'Libreria esercizi',s:''},{id:'admin-piano',icon:'🥗',label:'Piano alimentare',s:''},{id:'admin-risorse',icon:'📚',label:'Risorse clienti',s:''},{id:'admin-promemoria',icon:'🔔',label:'Promemoria',s:'Clienti'},{id:'admin-checkins',icon:'📊',label:'Check-in',s:''},
 {id:'admin-feedback',icon:'💬',label:'Feedback allenamento',s:''},{id:'admin-chat',icon:'💬',label:'Messaggi',s:''},{id:'admin-questionari',icon:'📝',label:'Questionari',s:''},];
 async function buildSidebar(r){
@@ -2243,7 +2267,7 @@ async function selectFreq(btn,id,val,prefix){btn.closest('.q-freq-group').queryS
 function renderAnamnesi(){
   const el=document.getElementById('anamnesi-container');
   if(!el)return;
-  el.innerHTML=ANAMNESI_QUESTIONS.map(q=>renderQBlock(q,anamnesiAnswers,'an')).join('')+`<div style="margin-top:20px;padding:16px;background:linear-gradient(135deg,rgba(232,82,122,0.10),rgba(248,221,230,0.55));border:2px solid rgba(232,82,122,0.30);border-radius:12px;font-size:13px;line-height:1.7;color:var(--text)">❤️&nbsp;<strong>Ricordati:</strong> inviami le <strong>fotografie</strong> (fronte, retro e laterali) su <strong>WhatsApp</strong> e carica <strong>peso e misure</strong> nell’apposita sezione dell’app.</div>`;
+  el.innerHTML=ANAMNESI_QUESTIONS.map(q=>renderQBlock(q,anamnesiAnswers,'an')).join('')+`<div style="margin-top:20px;padding:16px;background:linear-gradient(135deg,rgba(232,82,122,0.10),rgba(248,221,230,0.55));border:2px solid rgba(232,82,122,0.30);border-radius:12px;font-size:13px;line-height:1.7;color:var(--text)">❤️&nbsp;<strong>Ricordati:</strong> inviami le <strong>fotografie iniziali</strong> (fronte, retro e laterali) su <strong>WhatsApp</strong>, carica <strong>peso e misure</strong> nella sezione <em>Check-in mensile → Misure</em> e prenota la tua <strong>consulenza iniziale</strong> dall’apposita sezione <em>“Prenota chiamata”</em> del menu.</div>`;
 }
 function renderCheckQ(){
   const el=document.getElementById('check-q-container');
