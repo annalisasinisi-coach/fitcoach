@@ -542,6 +542,16 @@ input,textarea,select{font-family:'DM Sans',sans-serif}
         </div>
         <div id="schede-week-selector" style="display:none"></div>
         <div id="day-tabs-accordion"></div>
+        <div class="card" id="volume-chart-card" style="margin-top:14px;display:none">
+          <div class="card-title">📊 Volume per gruppo muscolare</div>
+          <div style="display:flex;gap:8px;margin:8px 0 12px;flex-wrap:wrap">
+            <button id="vol-btn-day" class="btn-sm" onclick="switchVolView('day')" style="background:var(--violet);color:#fff;border:none">Giorno corrente</button>
+            <button id="vol-btn-week" class="btn-ghost" onclick="switchVolView('week')">Settimana completa</button>
+          </div>
+          <div style="font-size:11px;color:var(--text3);margin-bottom:8px" id="vol-subtitle"></div>
+          <div class="chart-wrap"><canvas id="volChart"></canvas></div>
+          <div style="margin-top:8px;font-size:11px;color:var(--text3)" id="vol-total"></div>
+        </div>
         <div id="day-content" style="display:none"></div>
         <button class="btn-primary" style="width:100%;margin-top:14px" onclick="completeSession()">✓ Completa sessione</button>
       </div>
@@ -1713,7 +1723,7 @@ async function renderWorkout(){
     acc.innerHTML=currentMeso.giorni.map((g,i)=>{
       const isRest=g.tipo==='riposo';
       const exCount=g.esercizi?.length||0;
-      return `<details class="workout-day-details" id="day-det-${i}" style="border:1.5px solid var(--border);border-radius:var(--r2);margin-bottom:8px;overflow:hidden" ${i===startIdx?'open':''}>
+      return `<details class="workout-day-details" id="day-det-${i}" style="border:1.5px solid var(--border);border-radius:var(--r2);margin-bottom:8px;overflow:hidden" ${i===startIdx?'open':''} ontoggle="if(this.open){currentDay=${i};renderVolumeChart(${i});}">
         <summary style="padding:12px 16px;cursor:pointer;background:${isRest?'var(--warm)':'linear-gradient(135deg,var(--violet-pale),var(--rose-pale))'};list-style:none;display:flex;align-items:center;justify-content:space-between;user-select:none">
           <div>
             <span style="font-size:13px;font-weight:600;color:var(--text)">${g.label}${g.nome?' — '+g.nome:''}</span>
@@ -1726,6 +1736,7 @@ async function renderWorkout(){
     }).join('');
     // Render content for each day
     currentMeso.giorni.forEach((_,i)=>renderDayContentInto(i, document.getElementById('day-acc-'+i)));
+    setTimeout(()=>renderVolumeChart(startIdx),120);
   }
 }
 function startNextWorkout(){
@@ -1741,6 +1752,90 @@ function startNextWorkout(){
     const el=document.getElementById('day-det-'+idx);
     if(el){el.open=true;el.scrollIntoView({behavior:'smooth',block:'start'});}
   },350);
+}
+// ── VOLUME CHART ──
+// Mappa parole-chiave → gruppo muscolare
+const MUSCLE_KW={
+  'Lower Body':['squat','leg press','affondi','lunge','stacco','deadlift','hip thrust','curl femorale','leg curl','leg extension','calf','polpacci','glutei','sumo','hack squat','romanian','rdl','split squat','pistol'],
+  'Spalle':['alzate','shoulder press','military press','overhead','lento avanti','arnold','face pull','rear delt','deltoide'],
+  'Petto':['panca','bench press','chest','croci','fly','dips','petto'],
+  'Schiena':['lat machine','pull','rowing','rematore','pulley','trazioni','chin up','pull up','trapezio','scrollate','yt raise'],
+  'Bicipiti':['curl','bicep','bicipite','martello','hammer'],
+  'Tricipiti':['tricep','tricipite','french press','skull','pushdown','dip','kickback'],
+  'Core':['plank','crunch','addominali','ab ','russian twist','pallof','hollow','dead bug','mountain climber','leg raise'],
+  'Cardio':['cardio','corsa','run','bike','bici','rower','vogatore','jump','salto','hiit']
+};
+function guessGroup(name,cat){
+  const n=(name||'').toLowerCase();
+  for(const [g,kws] of Object.entries(MUSCLE_KW)){
+    if(kws.some(k=>n.includes(k)))return g;
+  }
+  if(cat){
+    if(cat.includes('Lower'))return 'Lower Body';
+    if(cat.includes('Core'))return 'Core';
+    if(cat.includes('Cardio'))return 'Cardio';
+    if(cat.includes('Upper'))return 'Spalle';
+  }
+  return 'Altro';
+}
+function calcVolume(giorni){
+  const vol={};
+  (giorni||[]).forEach(g=>{
+    if(g.tipo==='riposo')return;
+    (g.esercizi||[]).forEach(ex=>{
+      if(!ex.name)return;
+      const libEx=exerciseLibrary.find(e=>e.name===ex.name);
+      const grp=guessGroup(ex.name,libEx?.cat);
+      if(!vol[grp])vol[grp]={serie:0,rip:0};
+      const s=parseInt(ex.sets)||0;
+      vol[grp].serie+=s;
+      const repsN=parseInt(String(ex.reps||'0').split('-')[0])||0;
+      vol[grp].rip+=s*repsN;
+    });
+  });
+  return vol;
+}
+let _volChart=null;let _volView='day';
+function switchVolView(v){
+  _volView=v;
+  const db=document.getElementById('vol-btn-day');
+  const wb=document.getElementById('vol-btn-week');
+  if(db){db.style.cssText=v==='day'?'background:var(--violet);color:#fff;border:none':'';db.className=v==='day'?'btn-sm':'btn-ghost';}
+  if(wb){wb.style.cssText=v==='week'?'background:var(--violet);color:#fff;border:none':'';wb.className=v==='week'?'btn-sm':'btn-ghost';}
+  renderVolumeChart(currentDay);
+}
+function renderVolumeChart(dayIdx){
+  const card=document.getElementById('volume-chart-card');if(!card)return;
+  const giorni=currentMeso.giorni||[];if(!giorni.length){card.style.display='none';return;}
+  let srcGiorni;
+  if(_volView==='week'){
+    srcGiorni=(window._allSchede||[]).flatMap(s=>parseGiorni(s.giorni));
+    if(!srcGiorni.length)srcGiorni=giorni;
+  } else {
+    srcGiorni=giorni[dayIdx]?[giorni[dayIdx]]:[];
+  }
+  const vol=calcVolume(srcGiorni);
+  const labels=Object.keys(vol).filter(k=>vol[k].serie>0);
+  if(!labels.length){card.style.display='none';return;}
+  card.style.display='';
+  const g=giorni[dayIdx];
+  document.getElementById('vol-subtitle').textContent=_volView==='day'
+    ?`${g?.label||''}${g?.nome?' — '+g.nome:''}  ·  Dettaglio esercizi del giorno corrente`
+    :'Tutti i giorni di allenamento della settimana cumulati';
+  const totSerie=labels.reduce((s,k)=>s+vol[k].serie,0);
+  const totRip=labels.reduce((s,k)=>s+vol[k].rip,0);
+  document.getElementById('vol-total').textContent=`Totale: ${totSerie} serie · ~${totRip} ripetizioni`;
+  const palette=['rgba(123,63,160,0.75)','rgba(232,82,122,0.75)','rgba(255,140,80,0.75)','rgba(90,170,122,0.75)','rgba(80,140,200,0.75)','rgba(180,130,60,0.75)','rgba(160,100,180,0.75)','rgba(100,180,160,0.75)'];
+  const ctx=document.getElementById('volChart')?.getContext('2d');if(!ctx)return;
+  if(_volChart){_volChart.destroy();_volChart=null;}
+  _volChart=new Chart(ctx,{
+    type:'bar',
+    data:{labels,datasets:[
+      {label:'Serie',data:labels.map(k=>vol[k].serie),backgroundColor:palette.slice(0,labels.length),borderRadius:8,borderWidth:0,yAxisID:'y'},
+      {label:'~Rip.',data:labels.map(k=>vol[k].rip),backgroundColor:palette.slice(0,labels.length).map(c=>c.replace('0.75','0.25')),borderRadius:8,borderWidth:1.5,borderColor:palette.slice(0,labels.length),yAxisID:'y1',type:'bar'}
+    ]},
+    options:{responsive:true,plugins:{legend:{position:'bottom',labels:{font:{size:11},boxWidth:12}},tooltip:{callbacks:{label:ctx=>`${ctx.dataset.label}: ${ctx.raw}`}}},scales:{y:{beginAtZero:true,ticks:{stepSize:1},title:{display:true,text:'Serie',font:{size:10}},grid:{color:'rgba(0,0,0,0.05)'}},y1:{beginAtZero:true,position:'right',title:{display:true,text:'Rip. totali',font:{size:10}},grid:{display:false}},x:{grid:{display:false}}}}
+  });
 }
 async function switchScheda(id){
   const s=(window._allSchede||[]).find(s=>s.id===id);if(!s)return;
@@ -4089,79 +4184,103 @@ async function setupRealtimeChat(){
 // STAMPA SCHEDA PDF
 // ══════════════════════════════════
 function printScheda(){
-  printSchedaData(currentMeso, '');
+  printSchedaData(currentMeso, userProfile?.nome_completo||userProfile?.email||'');
 }
 function printSchedaData(s, clienteName){
   if(!s){toast('❌ Nessuna scheda da stampare');return;}
   const giorni=parseGiorni(s.giorni);if(!giorni.length){toast('❌ Nessuna scheda da stampare');return;}
-  const giornoHtml=g=>{
-    if(g.tipo==='riposo') return `<tr><td colspan="7" style="padding:10px 8px;background:#FDF0F5;font-style:italic;color:#C07040">😴 ${g.label} — ${g.nome||'Riposo'}</td></tr>`;
-    const tipoLabel={superset:'Superset',triset:'Triset',circuit:'Circuito'};
-    const tipoColor={superset:'#EDE4F7',triset:'#FDE8EE',circuit:'#FFF0E2'};
-    const esercizi=g.esercizi||[];
-    let rows='';let rendered=new Set();
-    esercizi.forEach((ex,i)=>{
-      if(rendered.has(i))return;
+  const TL={superset:'Superset',triset:'Triset',circuit:'Circuito'};
+  const TC={superset:'#EDE4F7',triset:'#FDE8EE',circuit:'#FFF0E2'};
+  const buildDay=g=>{
+    if(g.tipo==='riposo') return `<section class="day-page rest-page"><header class="day-hdr rest-hdr"><div class="dlabel">${g.label}</div><h2>😴 ${g.nome||'Giorno di Riposo'}</h2>${g.note?`<p class="dnote">${g.note}</p>`:''}</header><p style="text-align:center;padding:40px 20px;color:#C07040;font-size:15px;font-style:italic">Lascia che il corpo si ripari e cresca 💪</p></section>`;
+    const exs=g.esercizi||[];let body='';let rend=new Set();let n=0;
+    exs.forEach((ex,i)=>{
+      if(rend.has(i))return;n++;
       if(ex.gruppo&&ex.tipoGruppo){
-        const grpIdxs=esercizi.map((e,j)=>e.gruppo===ex.gruppo&&e.tipoGruppo===ex.tipoGruppo?j:-1).filter(x=>x>=0);
-        if(grpIdxs[0]===i){
-          const bg=tipoColor[ex.tipoGruppo]||'#F7F0FF';
-          rows+=`<tr><td colspan="7" style="padding:4px 8px 2px;background:${bg};font-size:10px;font-weight:700;color:#5A3A80;letter-spacing:0.05em;text-transform:uppercase">${i===0?`${g.label}${g.nome?' — '+g.nome:''} &nbsp;·&nbsp; `:''} ${tipoLabel[ex.tipoGruppo]||ex.tipoGruppo} ${ex.gruppo}</td></tr>`;
-          grpIdxs.forEach((gi,order)=>{
-            const gex=esercizi[gi];rendered.add(gi);
-            rows+=`<tr style="border-bottom:1px solid #F0E8E0;background:${bg}88">
-              <td style="padding:5px 8px;font-size:12px;color:#2D1F14">${order===0&&i===0?`<strong>${g.label}</strong>`:'&nbsp;'}</td>
-              <td style="padding:5px 8px;font-size:11px;color:#7B3FA0;font-weight:600">${tipoLabel[gex.tipoGruppo]||''} ${gex.gruppo}</td>
-              <td style="padding:5px 8px;font-size:13px">${gex.name}</td>
-              <td style="padding:5px 8px;font-size:12px;text-align:center">${gex.sets||'—'}</td>
-              <td style="padding:5px 8px;font-size:12px;text-align:center">${gex.reps||'—'}</td>
-              <td style="padding:5px 8px;font-size:12px;text-align:center">${gex.recupero||'—'}</td>
-              <td style="padding:5px 8px;font-size:12px;text-align:center">${gex.rpe!=null?gex.rpe:'—'}</td>
-            </tr>${gex.note?`<tr style="background:${bg}44"><td></td><td></td><td colspan="5" style="padding:2px 8px 5px;font-size:11px;color:#9A7A68;font-style:italic">📝 ${gex.note}</td></tr>`:''}`;
+        const gIs=exs.map((e,j)=>e.gruppo===ex.gruppo&&e.tipoGruppo===ex.tipoGruppo?j:-1).filter(x=>x>=0);
+        if(gIs[0]===i){
+          const bg=TC[ex.tipoGruppo]||'#F7F0FF';
+          body+=`<tr><td colspan="6" class="grp-hdr" style="background:${bg}">⚡ ${TL[ex.tipoGruppo]||ex.tipoGruppo} ${ex.gruppo} — alternare senza recupero intermedio</td></tr>`;
+          gIs.forEach((gi,ord)=>{const gx=exs[gi];rend.add(gi);
+            body+=`<tr class="ex-r" style="background:${bg}55"><td class="nc">${ord===0?n:''}</td><td class="namec">${gx.name}</td><td class="vc">${gx.sets||'—'}</td><td class="vc">${gx.reps||'—'}</td><td class="vc">${gx.recupero||'—'}</td><td class="vc rpe-td">${gx.rpe!=null&&gx.rpe!==''?`<span class="rpe-badge">RPE ${gx.rpe}</span>`:''}${gx.tecnica?`<span class="tec-badge">${gx.tecnica}</span>`:''}</td></tr>`;
+            if(gx.note)body+=`<tr class="note-r" style="background:${bg}22"><td></td><td colspan="5" class="notec">📝 ${gx.note}</td></tr>`;
           });
         }
       } else {
-        rendered.add(i);
-        rows+=`<tr style="border-bottom:1px solid #F0E8E0">
-          <td style="padding:6px 8px;font-size:12px;font-weight:600;color:#2D1F14">${i===0?`<strong>${g.label}${g.nome?' — '+g.nome:''}</strong>`:'&nbsp;'}</td>
-          <td style="padding:6px 8px;font-size:11px;color:#9A7A68"></td>
-          <td style="padding:6px 8px;font-size:13px">${ex.name}</td>
-          <td style="padding:6px 8px;font-size:12px;text-align:center">${ex.sets||'—'}</td>
-          <td style="padding:6px 8px;font-size:12px;text-align:center">${ex.reps||'—'}</td>
-          <td style="padding:6px 8px;font-size:12px;text-align:center">${ex.recupero||'—'}</td>
-          <td style="padding:6px 8px;font-size:12px;text-align:center">${ex.rpe!=null?ex.rpe:'—'}</td>
-        </tr>${ex.note?`<tr><td></td><td></td><td colspan="5" style="padding:2px 8px 6px;font-size:11px;color:#9A7A68;font-style:italic">📝 ${ex.note}</td></tr>`:''}`;
+        rend.add(i);
+        body+=`<tr class="ex-r"><td class="nc">${n}</td><td class="namec">${ex.name}</td><td class="vc">${ex.sets||'—'}</td><td class="vc">${ex.reps||'—'}</td><td class="vc">${ex.recupero||'—'}</td><td class="vc rpe-td">${ex.rpe!=null&&ex.rpe!==''?`<span class="rpe-badge">RPE ${ex.rpe}</span>`:''}${ex.tecnica?`<span class="tec-badge">${ex.tecnica}</span>`:''}</td></tr>`;
+        if(ex.note)body+=`<tr class="note-r"><td></td><td colspan="5" class="notec">📝 ${ex.note}</td></tr>`;
       }
     });
-    return rows + (g.note?`<tr><td colspan="7" style="padding:4px 8px 8px;font-size:11px;color:#7B3FA0;font-style:italic;background:#F7F0FF">📝 Note giorno: ${g.note}</td></tr>`:'');
+    const totS=exs.reduce((a,e)=>a+(parseInt(e.sets)||0),0);
+    return `<section class="day-page"><header class="day-hdr"><div class="dlabel">${g.label}</div><h2>${g.nome||''}</h2><p class="dmeta">${exs.length} esercizi · ${totS} serie totali</p></header>${g.note?`<div class="day-note-box">📋 ${g.note}</div>`:''}<table><thead><tr><th style="width:28px">#</th><th>Esercizio</th><th style="width:46px">Serie</th><th style="width:56px">Rip.</th><th style="width:68px">Rec.</th><th style="width:110px">RPE / Tecnica</th></tr></thead><tbody>${body}</tbody></table><footer class="pfooter"><span>Annalisa Sinisi Fit Coach${clienteName?' · '+clienteName:''}</span><span>${g.label}${g.nome?' — '+g.nome:''}</span></footer></section>`;
   };
-  const html=`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Scheda — ${s.nome}<\/title>
-  <style>
-    body{font-family:'Helvetica Neue',sans-serif;padding:32px;color:#2D1F14;max-width:900px;margin:0 auto}
-    h1{color:#E8527A;font-size:22px;margin-bottom:2px}
-    h2{color:#7B3FA0;font-size:14px;font-weight:400;margin-bottom:4px}
-    h3{font-size:13px;color:#9A7A68;font-weight:400;margin-bottom:20px}
-    table{width:100%;border-collapse:collapse;margin-bottom:24px;font-size:13px}
-    thead th{background:#F7EEF5;color:#7B3FA0;padding:7px 8px;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:0.05em}
-    tr:hover td{background:#FDF8F4}
-    .footer{margin-top:32px;font-size:11px;color:#B8A89A;border-top:1px solid #EDE0D8;padding-top:12px}
-    @media print{body{padding:16px}}
-  <\/style><\/head><body>
-  <h1>Annalisa Sinisi Fit Coach</h1>
-  <h2>${s.nome}${clienteName?' — '+clienteName:''}</h2>
-  <h3>Settimana ${s.current_week||1} di ${s.weeks||4} · ${giorni.length} giorni · ${giorni.reduce((t,g)=>t+(g.esercizi||[]).length,0)} esercizi totali${s.startDate?' · Dal '+new Date(s.startDate).toLocaleDateString('it-IT',{day:'numeric',month:'long',year:'numeric'}):''}</h3>
-  <table>
-    <thead><tr><th>Giorno</th><th>Gruppo</th><th>Esercizio</th><th>Serie</th><th>Reps</th><th>Recupero</th><th>RPE</th></tr></thead>
-    <tbody>${giorni.map(giornoHtml).join('')}</tbody>
-  </table>
-  ${s.note_globali?`<div style="background:#F7F0FF;border-left:4px solid #7B3FA0;padding:10px 14px;border-radius:4px;font-size:12px;color:#5A3A80;margin-bottom:24px"><strong>Note generali:</strong> ${s.note_globali}</div>`:''}
-  <div class="footer">Stampato il ${new Date().toLocaleDateString('it-IT',{day:'numeric',month:'long',year:'numeric',hour:'2-digit',minute:'2-digit'})} · annalisasinisi.coach</div>
-  <\/body><\/html>`;
+  const srif=parseSettimanaRif(s.giorni);const srifL=srif>0?`Settimana ${srif}`:'';
+  const totE=giorni.reduce((t,g)=>t+(g.esercizi||[]).length,0);
+  const totS=giorni.reduce((t,g)=>t+(g.esercizi||[]).reduce((a,e)=>a+(parseInt(e.sets)||0),0),0);
+  const startDate=s.startDate||s.start_date;
+  const html=`<!DOCTYPE html><html lang="it"><head><meta charset="UTF-8"><title>${s.nome}${clienteName?' — '+clienteName:''}<\/title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Helvetica Neue',Arial,sans-serif;color:#2D1F14;background:#fff;font-size:13px}
+.cover{padding:52px 48px;min-height:100vh;display:flex;flex-direction:column;page-break-after:always;background:linear-gradient(160deg,#fff 60%,#F7EEF5)}
+.logo{font-size:11px;font-weight:800;color:#E8527A;letter-spacing:0.12em;text-transform:uppercase;margin-bottom:64px}
+.cover-body{flex:1;display:flex;flex-direction:column;justify-content:center}
+.cover h1{font-size:34px;font-weight:900;color:#2D1F14;line-height:1.15;margin-bottom:8px}
+.cover .week-badge{display:inline-block;background:#7B3FA0;color:#fff;font-size:11px;font-weight:700;padding:3px 12px;border-radius:20px;margin-bottom:16px;letter-spacing:0.04em}
+.cover .client{font-size:20px;font-weight:700;color:#E8527A;margin-bottom:28px}
+.meta-box{background:#F7EEF5;border-radius:10px;border-left:5px solid #7B3FA0;padding:18px 22px;display:flex;flex-direction:column;gap:8px}
+.meta-row{display:flex;gap:12px;font-size:13px;color:#5A3A80}
+.meta-row strong{min-width:130px;color:#2D1F14}
+.note-globali{margin-top:20px;background:#FDE8EE;border-left:4px solid #E8527A;padding:12px 16px;border-radius:6px;font-size:12px;color:#7B3FA0;font-style:italic}
+.cover-footer{font-size:10px;color:#B8A89A;border-top:1px solid #EDE0D8;padding-top:12px}
+.day-page{padding:32px 48px 24px;page-break-after:always;min-height:100vh;display:flex;flex-direction:column}
+.day-page:last-child{page-break-after:auto}
+.day-hdr{background:linear-gradient(135deg,#F7EEF5,#FDE8EE);border-radius:10px;padding:16px 20px;margin-bottom:14px;border-left:5px solid #E8527A}
+.rest-page .day-hdr{background:linear-gradient(135deg,#FFF8F0,#FFF0E2);border-left-color:#C07040}
+.dlabel{font-size:10px;font-weight:800;color:#7B3FA0;text-transform:uppercase;letter-spacing:0.12em;margin-bottom:3px}
+.day-hdr h2{font-size:22px;font-weight:800;color:#2D1F14;margin-bottom:3px}
+.dmeta{font-size:11px;color:#9A7A68}
+.dnote{font-size:11px;color:#7B3FA0;font-style:italic;margin-top:4px}
+.day-note-box{background:#F7F0FF;border-left:3px solid #7B3FA0;padding:7px 12px;border-radius:4px;font-size:11px;color:#5A3A80;margin-bottom:12px;font-style:italic}
+table{width:100%;border-collapse:collapse;flex:1}
+thead th{background:#7B3FA0;color:#fff;padding:7px 10px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:0.06em;font-weight:700}
+.ex-r td{padding:7px 10px;border-bottom:1px solid #F0E8E0;vertical-align:middle}
+.ex-r:nth-child(odd) td{background:#FDFBF9}
+.nc{font-weight:700;color:#9A7A68;text-align:center;font-size:11px}
+.namec{font-weight:600;color:#2D1F14;font-size:13px}
+.vc{text-align:center;color:#5A3A80;font-size:12px}
+.rpe-td{vertical-align:middle}
+.rpe-badge{display:inline-block;background:#F7EEF5;color:#7B3FA0;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;margin:1px 2px}
+.tec-badge{display:inline-block;background:#7B3FA0;color:#fff;font-size:9px;font-weight:700;padding:2px 7px;border-radius:10px;margin:1px 2px;letter-spacing:0.02em}
+.grp-hdr td,.grp-hdr{font-size:10px;font-weight:700;color:#5A3A80;letter-spacing:0.06em;text-transform:uppercase;padding:5px 10px 3px}
+.note-r td{border-bottom:none}
+.notec{font-size:10px;color:#9A7A68;font-style:italic;padding:2px 10px 6px}
+.pfooter{display:flex;justify-content:space-between;font-size:10px;color:#B8A89A;border-top:1px solid #EDE0D8;padding-top:10px;margin-top:auto;padding-top:16px}
+@media print{*{-webkit-print-color-adjust:exact;print-color-adjust:exact}.day-page{page-break-after:always}.cover{page-break-after:always}}
+<\/style><\/head><body>
+<div class="cover">
+  <div class="logo">Annalisa Sinisi Fit Coach</div>
+  <div class="cover-body">
+    ${srifL?`<span class="week-badge">${srifL}</span>`:''}
+    <h1>${s.nome}</h1>
+    ${clienteName?`<div class="client">👤 ${clienteName}</div>`:''}
+    <div class="meta-box">
+      <div class="meta-row"><strong>Durata:</strong>${s.weeks||4} settimane</div>
+      <div class="meta-row"><strong>Giorni allenamento:</strong>${giorni.filter(g=>g.tipo!=='riposo').length} su ${giorni.length}</div>
+      <div class="meta-row"><strong>Esercizi totali:</strong>${totE}</div>
+      <div class="meta-row"><strong>Serie totali:</strong>${totS}</div>
+      ${startDate?`<div class="meta-row"><strong>Data inizio:</strong>${new Date(startDate).toLocaleDateString('it-IT',{day:'numeric',month:'long',year:'numeric'})}</div>`:''}
+    </div>
+    ${s.noteGlobali||s.note_globali?`<div class="note-globali">📋 <strong>Note coach:</strong> ${s.noteGlobali||s.note_globali}</div>`:''}
+  </div>
+  <div class="cover-footer">Generato il ${new Date().toLocaleDateString('it-IT',{day:'numeric',month:'long',year:'numeric'})} · annalisasinisi.coach</div>
+</div>
+${giorni.map(g=>buildDay(g)).join('')}
+<\/body><\/html>`;
   const win=window.open('','_blank');
   if(!win){toast('❌ Abilita i popup per stampare');return;}
-  win.document.write(html);
-  win.document.close();
-  setTimeout(()=>win.print(),500);
+  win.document.write(html);win.document.close();setTimeout(()=>win.print(),600);
 }
 
 
