@@ -60,7 +60,7 @@ input,textarea,select{font-family:'DM Sans',sans-serif}
 #app.visible{display:flex}
 .topnav{height:60px;background:#fff;border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 20px;gap:12px;flex-shrink:0;position:fixed;top:0;left:0;right:0;z-index:100;box-shadow:0 2px 12px rgba(180,100,80,0.06)}
 .topnav-brand{display:flex;align-items:center;gap:10px;flex:1}
-.topnav-logo{width:36px;height:36px;object-fit:contain}
+.topnav-logo{height:42px;width:auto;object-fit:contain;display:block}
 .topnav-name{font-family:'Playfair Display',serif;font-size:14px;color:var(--text);line-height:1.1}
 .topnav-name small{display:block;font-family:'DM Sans',sans-serif;font-size:10px;color:var(--text3);font-weight:400;letter-spacing:0.05em}
 .topnav-role{font-size:11px;font-weight:600;letter-spacing:0.07em;text-transform:uppercase;padding:4px 11px;border-radius:20px}
@@ -3796,7 +3796,7 @@ async function viewClient(clientId, clientName){
     // Scheda — tutte le settimane, ordinate per settimana_rif
     window._profiloSchedeMap=window._profiloSchedeMap||{};
     const _schedeOrd=(scheda||[]).map(s=>({...s,_srif:parseSettimanaRif(s.giorni)})).sort((a,b)=>(a._srif||999)-(b._srif||999));
-    html+=`<div style="margin-bottom:18px"><div style="font-size:11px;text-transform:uppercase;letter-spacing:0.06em;color:var(--text3);font-weight:600;margin-bottom:8px">📋 SCHEDE (${_schedeOrd.length})</div>`;
+    html+=`<details style="margin-bottom:14px;border:1.5px solid rgba(123,63,160,0.18);border-radius:var(--r2);overflow:hidden"><summary style="padding:10px 14px;cursor:pointer;background:linear-gradient(135deg,var(--violet-pale),var(--rose-pale));list-style:none;display:flex;justify-content:space-between;align-items:center;user-select:none;font-size:11px;text-transform:uppercase;letter-spacing:0.06em;color:var(--text3);font-weight:600"><span>📋 SCHEDE (${_schedeOrd.length})</span><span style="font-size:13px">▼</span></summary><div style="padding:10px 14px;background:var(--bg2)">`;
     if(_schedeOrd.length){
       _schedeOrd.forEach(s=>{
         window._profiloSchedeMap[s.id]=s;
@@ -3811,10 +3811,10 @@ async function viewClient(clientId, clientName){
       });
     }
     else html+=`<div style="font-size:13px;color:var(--text3);font-style:italic">Nessuna scheda assegnata</div>`;
-    html+='</div>';
+    html+='</div></details>';
     // Volume per gruppo muscolare per ogni scheda (solo se ci sono schede)
     if(_schedeOrd.length){
-      html+=`<div style="margin-bottom:18px"><div style="font-size:11px;text-transform:uppercase;letter-spacing:0.06em;color:var(--text3);font-weight:600;margin-bottom:8px">📊 VOLUME PER GRUPPO MUSCOLARE</div>`;
+      html+=`<details style="margin-bottom:14px;border:1.5px solid rgba(232,82,122,0.18);border-radius:var(--r2);overflow:hidden"><summary style="padding:10px 14px;cursor:pointer;background:linear-gradient(135deg,var(--rose-pale),var(--peach-pale));list-style:none;display:flex;justify-content:space-between;align-items:center;user-select:none;font-size:11px;text-transform:uppercase;letter-spacing:0.06em;color:var(--text3);font-weight:600"><span>📊 VOLUME PER GRUPPO MUSCOLARE</span><span style="font-size:13px">▼</span></summary><div style="padding:10px 14px;background:var(--bg2)">`;
       _schedeOrd.forEach(s=>{
         const srifLabel=s._srif>0?'Settimana '+s._srif:'Generale';
         const giorniArr=parseGiorni(s.giorni);
@@ -3830,7 +3830,7 @@ async function viewClient(clientId, clientName){
           <div style="display:flex;flex-wrap:wrap;gap:6px">${vlabels.map((k,i)=>`<div style="background:var(--warm);border-radius:6px;padding:6px 10px;min-width:100px;border-left:3px solid ${colors[i%colors.length]}"><div style="font-size:10px;font-weight:700;color:${colors[i%colors.length]}">${k}</div><div style="font-size:13px;font-weight:800;color:var(--text)">${vol[k].serie} serie</div><div style="font-size:10px;color:var(--text3)">~${vol[k].rip} rip.</div></div>`).join('')}</div>
         </div>`;
       });
-      html+=`</div>`;
+      html+=`</div></details>`;
     }
     // Check-in — collapsibili per data
     html+=`<details style="margin-bottom:16px;border:1.5px solid var(--border);border-radius:var(--r2);overflow:hidden" open>
