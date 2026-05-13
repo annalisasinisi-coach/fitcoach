@@ -638,16 +638,16 @@ input,textarea,select{font-family:'DM Sans',sans-serif}
             <div class="card">
               <div class="card-title">Nuovo check-in</div>
               <div style="font-size:12px;color:var(--text2);margin-bottom:14px" id="ci-date"></div>
-              <div class="field"><label>Peso (kg)</label><input type="number" id="ci-peso" step="0.1" placeholder="62.0"></div>
+              <div class="field"><label>Peso (kg) <span style="font-size:10px;color:var(--text3)">30–250</span></label><input type="number" id="ci-peso" step="0.1" min="30" max="250" placeholder="62.0"></div>
               <div class="divider"></div>
               <div style="font-size:11px;color:var(--text3);margin-bottom:10px;text-transform:uppercase;letter-spacing:0.06em;font-weight:500">Misure corporee (cm)</div>
               <div class="grid-2">
-                <div class="field"><label>Spalle</label><input type="number" id="ci-spalle" step="0.5" placeholder="96"></div>
-                <div class="field"><label>Vita</label><input type="number" id="ci-vita" step="0.5" placeholder="68"></div>
-                <div class="field"><label>Fianchi</label><input type="number" id="ci-fianchi" step="0.5" placeholder="94"></div>
-                <div class="field"><label>Glutei</label><input type="number" id="ci-glutei" step="0.5" placeholder="98"></div>
-                <div class="field"><label>Coscia sx</label><input type="number" id="ci-coscia" step="0.5" placeholder="55"></div>
-                <div class="field"><label>Coscia dx</label><input type="number" id="ci-coscia-dx" step="0.5" placeholder="55"></div>
+                <div class="field"><label>Spalle</label><input type="number" id="ci-spalle" step="0.5" min="30" max="200" placeholder="96"></div>
+                <div class="field"><label>Vita</label><input type="number" id="ci-vita" step="0.5" min="30" max="200" placeholder="68"></div>
+                <div class="field"><label>Fianchi</label><input type="number" id="ci-fianchi" step="0.5" min="30" max="200" placeholder="94"></div>
+                <div class="field"><label>Glutei</label><input type="number" id="ci-glutei" step="0.5" min="30" max="200" placeholder="98"></div>
+                <div class="field"><label>Coscia sx</label><input type="number" id="ci-coscia" step="0.5" min="30" max="200" placeholder="55"></div>
+                <div class="field"><label>Coscia dx</label><input type="number" id="ci-coscia-dx" step="0.5" min="30" max="200" placeholder="55"></div>
               </div>
               <button class="btn-primary" style="width:100%;margin-top:4px" onclick="saveCheckin()">Salva misure</button>
             </div>
@@ -1050,6 +1050,14 @@ input,textarea,select{font-family:'DM Sans',sans-serif}
 </div>
 
 <div class="toast" id="toast-el"><div class="toast-dot"></div><span id="toast-txt"></span></div>
+<div id="confirm-modal" style="display:none;position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,0.45);align-items:center;justify-content:center;padding:20px">
+  <div style="background:var(--bg);border-radius:20px;padding:32px 24px;max-width:340px;width:100%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,0.25)">
+    <div id="confirm-modal-icon" style="font-size:48px;margin-bottom:12px"></div>
+    <div id="confirm-modal-title" style="font-size:18px;font-weight:800;color:var(--text);margin-bottom:8px"></div>
+    <div id="confirm-modal-body" style="font-size:13px;color:var(--text2);line-height:1.6;margin-bottom:24px"></div>
+    <button onclick="closeConfirmModal()" style="background:linear-gradient(135deg,var(--rose),var(--violet));color:#fff;border:none;border-radius:var(--r2);padding:12px 32px;font-size:14px;font-weight:700;cursor:pointer;width:100%">Perfetto! ✓</button>
+  </div>
+</div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -1456,8 +1464,8 @@ async function loadUserData(){
       const {data:allProfiles}=await supa.from('profiles').select('*').eq('role','cliente');
       if(allProfiles?.length){
         // Get last sessions and checkins for each client
-        const {data:lastSessions}=await supa.from('sessioni').select('cliente_id,data_sessione').eq('completata',true).order('data_sessione',{ascending:false});
-        const {data:lastCis}=await supa.from('checkins').select('cliente_id,data_checkin').order('data_checkin',{ascending:false});
+        const {data:lastSessions}=await supa.from('sessioni').select('cliente_id,data_sessione').eq('completata',true).order('data_sessione',{ascending:false}).limit(200);
+        const {data:lastCis}=await supa.from('checkins').select('cliente_id,data_checkin').order('data_checkin',{ascending:false}).limit(200);
         
         clientiList = allProfiles.map(p=>{
           const lastS=lastSessions?.find(s=>s.cliente_id===p.id);
@@ -1482,7 +1490,7 @@ async function loadUserData(){
         });
       } else { clientiList=[]; }
       // Load all checkins for admin
-      const {data:allCi}=await supa.from('checkins').select('*').order('data_checkin',{ascending:false});
+      const {data:allCi}=await supa.from('checkins').select('*').order('data_checkin',{ascending:false}).limit(24);
       if(allCi?.length) allCheckins = allCi;
       // Load exercises library from Supabase
       const libData = await dbAll('esercizi');
@@ -1586,7 +1594,7 @@ async function renderHome(){
   if(sesEl){
     // Load real sessions from Supabase
     if(user?.id){
-      const {data:sessData}=await supa.from('sessioni').select('id').eq('cliente_id',user.id).eq('completata',true);
+      const {data:sessData}=await supa.from('sessioni').select('id',{count:'exact',head:false}).eq('cliente_id',user.id).eq('completata',true).limit(500);
       sesEl.textContent=sessData?.length||0;
     } else sesEl.textContent='0';
   }
@@ -1941,6 +1949,10 @@ async function saveWeight(name,key){
 }
 async function selEmoji(key,emoji,btn){const fb=ls(`fb_${key}`,{emoji:'',text:''});fb.emoji=emoji;ss(`fb_${key}`,fb);btn.closest('.emoji-row').querySelectorAll('.emoji-btn').forEach(b=>b.classList.remove('selected'));btn.classList.add('selected');}
 async function saveFb(key){const text=document.getElementById(`ftxt_${key}`)?.value||'';const fb=ls(`fb_${key}`,{emoji:'',text:''});fb.text=text;ss(`fb_${key}`,fb);
+  try{
+    if(user?.id&&text){await supa.from('feedback_esercizi').insert({cliente_id:user.id,esercizio_key:key,feedback_text:text,feedback_emoji:fb.emoji,created_at:new Date().toISOString()});}
+  }catch(e){console.warn('saveFb remote:',e);}
+  toast('💬 Feedback salvato!');
   if(user?.id){
     const card=document.getElementById('card_'+key);
     const exName=card?.querySelector('.ex-name')?.textContent||key;
@@ -1948,35 +1960,46 @@ async function saveFb(key){const text=document.getElementById(`ftxt_${key}`)?.va
   }
   toast('Feedback salvato!');}
 async function completeSession(){
-  if(user?.id&&currentMeso.nome){
-    await dbInsert('sessioni',{cliente_id:user.id,giorno_index:currentDay,data_sessione:new Date().toISOString().slice(0,10),completata:true});
-    const giorni=currentMeso.giorni;
-    if(giorni?.length){
-      let nextIdx=0;let looped=false;
-      for(let i=1;i<=giorni.length;i++){
-        const idx=(currentDay+i)%giorni.length;
-        if(giorni[idx]?.tipo!=='riposo'){nextIdx=idx;looped=(currentDay+i)>=giorni.length;break;}
-      }
-      // Se abbiamo completato il ciclo, avanza alla scheda della settimana successiva
-      if(looped){
-        const allSchede=window._allSchede||[];
-        const curI=allSchede.findIndex(s=>s.id===window._currentSchedaId);
-        const nextScheda=allSchede[curI+1]||null; // null = nessuna prossima
-        if(nextScheda){
-          window._currentSchedaId=nextScheda.id;
-          currentMeso={nome:nextScheda.nome,weeks:nextScheda.weeks||4,currentWeek:currentMeso.currentWeek,startDate:nextScheda.start_date||'',noteGlobali:nextScheda.note_globali||'',giorni:parseGiorni(nextScheda.giorni)};
-          // Trova il primo giorno non-riposo nella nuova scheda
-          nextIdx=0;
-          for(let j=0;j<currentMeso.giorni.length;j++){if(currentMeso.giorni[j]?.tipo!=='riposo'){nextIdx=j;break;}}
-          localStorage.setItem('asfc4_nextSchedaId_'+(user?.id||''),nextScheda.id);
+  try{
+    if(user?.id&&currentMeso.nome){
+      const {error}=await supa.from('sessioni').insert({cliente_id:user.id,giorno_index:currentDay,data_sessione:new Date().toISOString().slice(0,10),completata:true});
+      if(error)throw error;
+      const giorni=currentMeso.giorni;
+      if(giorni?.length){
+        let nextIdx=0;let looped=false;
+        for(let i=1;i<=giorni.length;i++){
+          const idx=(currentDay+i)%giorni.length;
+          if(giorni[idx]?.tipo!=='riposo'){nextIdx=idx;looped=(currentDay+i)>=giorni.length;break;}
         }
+        if(looped){
+          const allSchede=window._allSchede||[];
+          const curI=allSchede.findIndex(s=>s.id===window._currentSchedaId);
+          const nextScheda=allSchede[curI+1]||null;
+          if(nextScheda){
+            window._currentSchedaId=nextScheda.id;
+            currentMeso={nome:nextScheda.nome,weeks:nextScheda.weeks||4,currentWeek:currentMeso.currentWeek,startDate:nextScheda.start_date||'',noteGlobali:nextScheda.note_globali||'',giorni:parseGiorni(nextScheda.giorni)};
+            nextIdx=0;
+            for(let j=0;j<currentMeso.giorni.length;j++){if(currentMeso.giorni[j]?.tipo!=='riposo'){nextIdx=j;break;}}
+            localStorage.setItem('asfc4_nextSchedaId_'+(user?.id||''),nextScheda.id);
+          }
+        }
+        localStorage.setItem('asfc4_nextDay_'+(user?.id||''),String(nextIdx));
+        window._nextWorkoutIdx=nextIdx;
       }
-      localStorage.setItem('asfc4_nextDay_'+(user?.id||''),String(nextIdx));
-      window._nextWorkoutIdx=nextIdx;
     }
+    toast('🎉 Sessione completata! Ottimo lavoro!');
+    setTimeout(()=>navigate('home'),800);
+  }catch(err){
+    console.error('completeSession error:',err);
+    // Salva localmente anche se Supabase fallisce
+    const nextIdx=parseInt(localStorage.getItem('asfc4_nextDay_'+(user?.id||'')))||0;
+    const giorni=currentMeso.giorni||[];
+    let ni=0;
+    for(let i=1;i<=giorni.length;i++){const idx=(currentDay+i)%giorni.length;if(giorni[idx]?.tipo!=='riposo'){ni=idx;break;}}
+    localStorage.setItem('asfc4_nextDay_'+(user?.id||''),String(ni));
+    toast('⚠️ Sessione registrata localmente — salvataggio online non riuscito. Riprova più tardi.');
+    setTimeout(()=>navigate('home'),1500);
   }
-  toast('🎉 Sessione completata! Ottimo lavoro!');
-  setTimeout(()=>navigate('home'),800);
 }
 
 // ══════════════════════════════════
@@ -2273,13 +2296,30 @@ async function renderCiQuickHistory(){
 // ══════════════════════════════════
 async function rv(id,v){const el=document.getElementById(id);if(el)el.textContent=v;}
 async function saveCheckin(){
-  const peso=parseFloat(document.getElementById('ci-peso').value);if(!peso){toast('❌ Inserisci il peso');return;}
-  const obj={date:new Date().toISOString().slice(0,10),peso,spalle:parseFloat(document.getElementById('ci-spalle').value)||0,vita:parseFloat(document.getElementById('ci-vita').value)||0,fianchi:parseFloat(document.getElementById('ci-fianchi').value)||0,glutei:parseFloat(document.getElementById('ci-glutei').value)||0,coscia:parseFloat(document.getElementById('ci-coscia').value)||0,benessere:7};
-  checkins.push(obj);
-  if(user?.id){
-    await dbInsert('checkins',{cliente_id:user.id,data_checkin:obj.date,peso:obj.peso,spalle:obj.spalle,vita:obj.vita,fianchi:obj.fianchi,glutei:obj.glutei,coscia_sx:obj.coscia,coscia_dx:parseFloat(document.getElementById('ci-coscia-dx').value)||0});
+  const peso=parseFloat(document.getElementById('ci-peso').value);
+  if(!peso){toast('❌ Inserisci il peso');return;}
+  if(peso<30||peso>250){toast('❌ Peso non valido: inserisci un valore tra 30 e 250 kg');return;}
+  const misure=['ci-spalle','ci-vita','ci-fianchi','ci-glutei','ci-coscia','ci-coscia-dx'];
+  for(const id of misure){
+    const v=parseFloat(document.getElementById(id)?.value||0);
+    if(v>0&&(v<30||v>200)){toast('❌ Misura non valida: i valori devono essere tra 30 e 200 cm');document.getElementById(id)?.focus();return;}
   }
-  renderCiQuickHistory();toast('✅ Misure salvate!');document.getElementById('ci-peso').value='';
+  const obj={date:new Date().toISOString().slice(0,10),peso,spalle:parseFloat(document.getElementById('ci-spalle').value)||0,vita:parseFloat(document.getElementById('ci-vita').value)||0,fianchi:parseFloat(document.getElementById('ci-fianchi').value)||0,glutei:parseFloat(document.getElementById('ci-glutei').value)||0,coscia:parseFloat(document.getElementById('ci-coscia').value)||0,benessere:7};
+  try{
+    checkins.push(obj);
+    if(user?.id){
+      const {error}=await supa.from('checkins').insert({cliente_id:user.id,data_checkin:obj.date,peso:obj.peso,spalle:obj.spalle,vita:obj.vita,fianchi:obj.fianchi,glutei:obj.glutei,coscia_sx:obj.coscia,coscia_dx:parseFloat(document.getElementById('ci-coscia-dx').value)||0});
+      if(error)throw error;
+    }
+    renderCiQuickHistory();
+    showConfirmModal('✅ Misure salvate!','Peso e misure sono stati registrati correttamente. Annalisa potrà vederli nel tuo profilo.','📊');
+    document.getElementById('ci-peso').value='';
+    ['ci-spalle','ci-vita','ci-fianchi','ci-glutei','ci-coscia','ci-coscia-dx'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  }catch(err){
+    console.error('saveCheckin error:',err);
+    toast('❌ Errore nel salvataggio: '+(err.message||'riprova'));
+    checkins.pop(); // rollback local
+  }
 }
 async function renderCiHistory(){
   const el=document.getElementById('ci-history');if(!el)return;
@@ -2392,31 +2432,31 @@ function collectAnswers(prefix,questions){
 }
 async function submitAnamnesi(){
   if(!user?.id){toast('❌ Devi essere loggata');return;}
-  // Check if record exists first (avoids ON CONFLICT error if UNIQUE constraint is missing)
-  const {data:existing}=await supa.from('anamnesi').select('id').eq('cliente_id',user.id).maybeSingle();
-  let error;
-  if(existing){
-    ({error}=await supa.from('anamnesi').update({risposte:anamnesiAnswers,updated_at:new Date().toISOString()}).eq('cliente_id',user.id));
-  } else {
-    ({error}=await supa.from('anamnesi').insert({cliente_id:user.id,risposte:anamnesiAnswers,updated_at:new Date().toISOString()}));
-  }
-  if(error){toast('❌ Errore: '+error.message);console.error(error);return;}
-  toast('✅ Questionario inviato ad Annalisa! 💛');}
+  try{
+    const {data:existing}=await supa.from('anamnesi').select('id').eq('cliente_id',user.id).maybeSingle();
+    let error;
+    if(existing){({error}=await supa.from('anamnesi').update({risposte:anamnesiAnswers,updated_at:new Date().toISOString()}).eq('cliente_id',user.id));}
+    else{({error}=await supa.from('anamnesi').insert({cliente_id:user.id,risposte:anamnesiAnswers,updated_at:new Date().toISOString()}));}
+    if(error)throw error;
+    showConfirmModal('✅ Questionario inviato!','La tua anamnesi è stata inviata ad Annalisa. Ricorda di inviarle le fotografie su WhatsApp e di prenotare la tua consulenza iniziale!','💛');
+  }catch(err){console.error('submitAnamnesi error:',err);toast('❌ Errore: '+(err.message||'riprova'));}
+}
 async function submitCheckin(){
   if(!user?.id){toast('❌ Devi essere loggata');return;}
-  const mese=new Date().toLocaleDateString('it-IT',{month:'long',year:'numeric'});
-  const {data,error}=await supa.from('check_questionari').insert({
-    cliente_id:user.id,
-    mese,
-    risposte:checkAnswers
-  }).select('id');
-  if(error){
-    console.error('submitCheckin error:',error);
-    toast('❌ Errore: '+error.message);
-    return;
+  try{
+    const mese=new Date().toLocaleDateString('it-IT',{month:'long',year:'numeric'});
+    const {error}=await supa.from('check_questionari').insert({cliente_id:user.id,mese,risposte:checkAnswers}).select('id');
+    if(error)throw error;
+    checkAnswers={};ss('checkAnswers',{});
+    showConfirmModal('✅ Check-in mensile inviato!','Annalisa riceverà una notifica e risponderà al più presto. Ricorda di inviarle le fotografie su WhatsApp e di aggiornare peso e misure nella sezione apposita!','💛');
+  }catch(err){
+    console.error('submitCheckin error:',err);
+    if(err.message?.includes('duplicate')||err.code==='23505'){
+      toast('⚠️ Hai già inviato il check-in questo mese');
+    } else {
+      toast('❌ Errore: '+(err.message||'riprova tra qualche istante'));
+    }
   }
-  checkAnswers={};ss('checkAnswers',{});
-  toast('✅ Check-in mensile inviato ad Annalisa! 💛');
 }
 function exportAnamnesi(){exportToPdf('Questionario di Anamnesi',ANAMNESI_QUESTIONS,anamnesiAnswers);}
 function exportCheckin(){exportToPdf('Check mensile',CHECK_QUESTIONS,checkAnswers);}
@@ -3244,7 +3284,7 @@ async function renderAdminCi(){
   }
   const selectedId=filterEl?.value||'';
   // Load from Supabase
-  let q=supa.from('checkins').select('*, profiles(nome,cognome,email)').order('created_at',{ascending:false});
+  let q=supa.from('checkins').select('*, profiles(nome,cognome,email)').order('created_at',{ascending:false}).limit(100);
   if(selectedId) q=q.eq('cliente_id',selectedId);
   const {data:ciData}=await q;
   if(!ciData?.length){el.innerHTML='<div class="card" style="text-align:center;padding:40px;color:var(--text2)">Nessun check-in ricevuto</div>';return;}
@@ -3470,7 +3510,7 @@ async function loadAdminQuestionariData() {
     });
   }
   // Load real check questionari
-  const {data:ckData,error:ckErr}=await supa.from('check_questionari').select('*, profiles(nome,cognome,email)').order('created_at',{ascending:false}).order('id',{ascending:false});
+  const {data:ckData,error:ckErr}=await supa.from('check_questionari').select('*, profiles(nome,cognome,email)').order('created_at',{ascending:false}).order('id',{ascending:false}).limit(100);
   if(ckData?.length){
     ckData.forEach(c=>{
       const name=((c.profiles?.nome||'')+(c.profiles?.cognome?' '+c.profiles.cognome:'')).trim()||c.profiles?.email||'Cliente';
@@ -3727,6 +3767,16 @@ function ytEmbed(src,title=''){
   </div>`;
 }
 async function toast(msg){clearTimeout(toastTm);document.getElementById('toast-txt').textContent=msg;document.getElementById('toast-el').classList.add('show');toastTm=setTimeout(()=>document.getElementById('toast-el').classList.remove('show'),2800);}
+function showConfirmModal(title,body,icon='✅'){
+  const m=document.getElementById('confirm-modal');if(!m)return;
+  document.getElementById('confirm-modal-icon').textContent=icon;
+  document.getElementById('confirm-modal-title').textContent=title;
+  document.getElementById('confirm-modal-body').textContent=body;
+  m.style.display='flex';
+}
+function closeConfirmModal(){
+  const m=document.getElementById('confirm-modal');if(m)m.style.display='none';
+}
 
 // ── REGISTER ──
 async function showRegister(){
