@@ -1463,13 +1463,24 @@ async function loadUserData(){
       // Admin: load all clients
       const {data:allProfiles}=await supa.from('profiles').select('*').eq('role','cliente');
       if(allProfiles?.length){
-        // Get last sessions and checkins for each client
-        const {data:lastSessions}=await supa.from('sessioni').select('cliente_id,data_sessione').eq('completata',true).order('data_sessione',{ascending:false}).limit(200);
-        const {data:lastCis}=await supa.from('checkins').select('cliente_id,data_checkin').order('data_checkin',{ascending:false}).limit(200);
+        // Fetch ultima sessione e ultimo check-in per ogni cliente — query separate ed efficienti
+        const clientIds=allProfiles.map(p=>p.id);
+        // Una query per tutti: prende le ultime N sessioni per cliente (ordinato desc, poi raggruppiamo in JS)
+        // Con 40 clienti e limit(40) prendiamo l'ultima di ciascuno in modo affidabile
+        const sessPromises=clientIds.map(id=>
+          supa.from('sessioni').select('cliente_id,data_sessione').eq('cliente_id',id).eq('completata',true).order('data_sessione',{ascending:false}).limit(1).maybeSingle()
+        );
+        const ciPromises=clientIds.map(id=>
+          supa.from('checkins').select('cliente_id,data_checkin').eq('cliente_id',id).order('data_checkin',{ascending:false}).limit(1).maybeSingle()
+        );
+        const [sessResults,ciResults]=await Promise.all([Promise.all(sessPromises),Promise.all(ciPromises)]);
+        const lastSessionMap={};const lastCiMap={};
+        sessResults.forEach(r=>{if(r.data)lastSessionMap[r.data.cliente_id]=r.data.data_sessione;});
+        ciResults.forEach(r=>{if(r.data)lastCiMap[r.data.cliente_id]=r.data.data_checkin;});
         
         clientiList = allProfiles.map(p=>{
-          const lastS=lastSessions?.find(s=>s.cliente_id===p.id);
-          const lastCi=lastCis?.find(c=>c.cliente_id===p.id);
+          const lastS=lastSessionMap[p.id];
+          const lastCi=lastCiMap[p.id];
           const fmtDate=(d)=>{
             if(!d)return '—';
             const date=new Date(d);
@@ -1483,14 +1494,14 @@ async function loadUserData(){
             name:((p.nome||'')+(p.cognome?' '+p.cognome:'')).trim()||p.email||'Cliente',
             email:p.email||'',
             stato:'attiva',
-            lastW:fmtDate(lastS?.data_sessione),
-            lastCI:fmtDate(lastCi?.data_checkin),
+            lastW:fmtDate(lastS),
+            lastCI:fmtDate(lastCi),
             ad:0
           };
         });
       } else { clientiList=[]; }
       // Load all checkins for admin
-      const {data:allCi}=await supa.from('checkins').select('*').order('data_checkin',{ascending:false}).limit(24);
+      const {data:allCi}=await supa.from('checkins').select('*').order('data_checkin',{ascending:false}).limit(36);
       if(allCi?.length) allCheckins = allCi;
       // Load exercises library from Supabase
       const libData = await dbAll('esercizi');
@@ -1594,7 +1605,7 @@ async function renderHome(){
   if(sesEl){
     // Load real sessions from Supabase
     if(user?.id){
-      const {data:sessData}=await supa.from('sessioni').select('id',{count:'exact',head:false}).eq('cliente_id',user.id).eq('completata',true).limit(500);
+      const {data:sessData}=await supa.from('sessioni').select('id',{count:'exact',head:false}).eq('cliente_id',user.id).eq('completata',true).limit(1000);
       sesEl.textContent=sessData?.length||0;
     } else sesEl.textContent='0';
   }
@@ -3284,7 +3295,7 @@ async function renderAdminCi(){
   }
   const selectedId=filterEl?.value||'';
   // Load from Supabase
-  let q=supa.from('checkins').select('*, profiles(nome,cognome,email)').order('created_at',{ascending:false}).limit(100);
+  let q=supa.from('checkins').select('*, profiles(nome,cognome,email)').order('created_at',{ascending:false}).limit(500);
   if(selectedId) q=q.eq('cliente_id',selectedId);
   const {data:ciData}=await q;
   if(!ciData?.length){el.innerHTML='<div class="card" style="text-align:center;padding:40px;color:var(--text2)">Nessun check-in ricevuto</div>';return;}
@@ -3510,7 +3521,7 @@ async function loadAdminQuestionariData() {
     });
   }
   // Load real check questionari
-  const {data:ckData,error:ckErr}=await supa.from('check_questionari').select('*, profiles(nome,cognome,email)').order('created_at',{ascending:false}).order('id',{ascending:false}).limit(100);
+  const {data:ckData,error:ckErr}=await supa.from('check_questionari').select('*, profiles(nome,cognome,email)').order('created_at',{ascending:false}).order('id',{ascending:false}).limit(500);
   if(ckData?.length){
     ckData.forEach(c=>{
       const name=((c.profiles?.nome||'')+(c.profiles?.cognome?' '+c.profiles.cognome:'')).trim()||c.profiles?.email||'Cliente';
