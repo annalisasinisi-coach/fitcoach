@@ -1402,7 +1402,7 @@ async function loadUserData(){
       const ciData = await dbGet('checkins','cliente_id',user.id);
       if(ciData.length) checkins = ciData.map(c=>({date:c.data_checkin,peso:c.peso,spalle:c.spalle,vita:c.vita,fianchi:c.fianchi,glutei:c.glutei,coscia:c.coscia_sx,benessere:7}));
       // Load chat messages
-      const {data:msgs}=await supa.from('messaggi').select('*').or(`mittente_id.eq.${user.id},destinatario_id.eq.${user.id}`).order('created_at');
+      const {data:msgs}=await supa.from('messaggi').select('*').or(`mittente_id.eq.${user.id},destinatario_id.eq.${user.id}`).order('created_at',{ascending:false}).limit(100);
       if(msgs?.length) chatMsgs = msgs.map(m=>({from:m.mittente_id===user.id?'me':'coach',text:m.testo||'',time:new Date(m.created_at).toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'}),type:m.tipo||'text',fname:m.file_nome}));
       // Load piano alimentare
       const pianoData = await dbGet('piani_alimentari','cliente_id',user.id);
@@ -1454,7 +1454,7 @@ async function loadUserData(){
         exerciseLibrary=libDataC.map(e=>({id:e.id,name:e.nome,cat:e.categoria||'',video:e.video_url||'',desc:e.descrizione||''}));
       }
       // Load pesi
-      const {data:pesiData}=await supa.from('pesi_esercizi').select('*').eq('cliente_id',user.id).order('data_registrazione');
+      const {data:pesiData}=await supa.from('pesi_esercizi').select('*').eq('cliente_id',user.id).order('data_registrazione',{ascending:false}).limit(200);
       if(pesiData?.length){
         weightHist={};
         pesiData.forEach(p=>{if(!weightHist[p.esercizio_nome])weightHist[p.esercizio_nome]=[];const d=new Date(p.data_registrazione);weightHist[p.esercizio_nome].push({date:`${d.getDate().toString().padStart(2,'0')}/${(d.getMonth()+1).toString().padStart(2,'0')}`,kg:p.kg});});
@@ -1510,12 +1510,12 @@ async function loadUserData(){
         ss('asfc4_library',exerciseLibrary);
       }
       // Load schede list — solo attive per il contatore
-      const {data:schedeData}=await supa.from('schede').select('*').eq('attiva',true).order('created_at',{ascending:false});
+      const {data:schedeData}=await supa.from('schede').select('id,nome,cliente_id,weeks,start_date,created_at,giorni').eq('attiva',true).order('created_at',{ascending:false}).limit(200);
       if(schedeData?.length){
         schedeList=schedeData.map(s=>({id:s.id,nome:s.nome,clienteId:s.cliente_id,weeks:s.weeks,start:s.start_date,data:s.created_at?.slice(0,10)}));
       } else { schedeList=[]; }
       // Load all messages for admin chat — use plain select (no join to avoid FK-name issues)
-      const {data:allMsgs}=await supa.from('messaggi').select('*').order('created_at');
+      const {data:allMsgs}=await supa.from('messaggi').select('*').order('created_at',{ascending:false}).limit(500);
       if(allMsgs?.length){
         adminChatData={};
         allMsgs.forEach(m=>{
@@ -1961,7 +1961,7 @@ async function saveWeight(name,key){
 async function selEmoji(key,emoji,btn){const fb=ls(`fb_${key}`,{emoji:'',text:''});fb.emoji=emoji;ss(`fb_${key}`,fb);btn.closest('.emoji-row').querySelectorAll('.emoji-btn').forEach(b=>b.classList.remove('selected'));btn.classList.add('selected');}
 async function saveFb(key){const text=document.getElementById(`ftxt_${key}`)?.value||'';const fb=ls(`fb_${key}`,{emoji:'',text:''});fb.text=text;ss(`fb_${key}`,fb);
   try{
-    if(user?.id&&text){await supa.from('feedback_esercizi').insert({cliente_id:user.id,esercizio_key:key,feedback_text:text,feedback_emoji:fb.emoji,created_at:new Date().toISOString()});}
+    // Feedback stored in localStorage only — DB write removed to save bandwidth
   }catch(e){console.warn('saveFb remote:',e);}
   toast('💬 Feedback salvato!');
   if(user?.id){
@@ -2643,7 +2643,7 @@ async function renderAdminDash(){
     <td><span style="font-size:10px;color:var(--text3)">Stato: </span><span class="badge ${c.stato==='attiva'?'badge-green':c.stato==='pausa'?'badge-red':'badge-violet'}">${c.stato}</span></td>
     <td><span style="font-size:10px;color:var(--text3)">Ult. all.: </span>${c.lastW}</td>
     <td><span style="font-size:10px;color:var(--text3)">Check-in: </span>${c.lastCI}</td>
-    <td><div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:4px"><button class="btn-sm" onclick="navigate('admin-chat')">💬</button><button class="btn-violet" onclick="navigate('admin-schede')">📋</button><button class="btn-ghost view-client-btn" data-id="${c.id}" data-name="${c.name.replace(/"/g,'&quot;')}">👁 Profilo</button></div></td>
+    <td><div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:4px"><button class="btn-sm" onclick="navigate('admin-chat')">💬</button><button class="btn-violet" onclick="navigate('admin-schede')">📋</button><button class="btn-ghost view-client-btn" data-id="${c.id}" data-name="${c.name.replace(/"/g,'&quot;')}">👁 Profilo</button><button class="btn-danger" style="font-size:11px;padding:4px 8px" onclick="deleteCliente('${c.id}','${c.name.replace(/'/g,"\\'")}')">🗑</button></div></td>
   </tr>`).join('');}
 
 // ── SCHEDA BUILDER ──
@@ -2728,7 +2728,7 @@ function resetBuilder(){
 }
 async function renderSchedeList(){
   // Reload from DB — only show active schede
-  const {data:schedeData}=await supa.from('schede').select('*').eq('attiva',true).order('created_at',{ascending:false});
+  const {data:schedeData}=await supa.from('schede').select('id,nome,cliente_id,weeks,start_date,created_at,giorni').eq('attiva',true).order('created_at',{ascending:false}).limit(200);
   if(schedeData?.length){
     schedeList=schedeData.map(s=>{
       return {id:s.id,nome:s.nome,clienteId:s.cliente_id,weeks:s.weeks,start:s.start_date,data:s.created_at?.slice(0,10),settimana_rif:parseSettimanaRif(s.giorni)};
@@ -2816,8 +2816,7 @@ async function duplicaScheda(id){
 async function delScheda(id,i){
   if(!confirm('Sicura di voler eliminare questa scheda? L\'operazione non è reversibile.'))return;
   if(id&&user?.id){
-    // Set attiva=false so the client loses the scheda, but we keep history
-    const {error}=await supa.from('schede').update({attiva:false}).eq('id',id);
+    const {error}=await supa.from('schede').delete().eq('id',id);
     if(error){toast('❌ Errore eliminazione: '+error.message);console.error(error);return;}
   }
   schedeList.splice(i,1);
@@ -3848,6 +3847,22 @@ async function doRegister(){
 }
 
 // ── VIEW CLIENT ──
+async function deleteCliente(clienteId, clienteName){
+  if(!confirm(`⚠️ Eliminare definitivamente il profilo di ${clienteName}?\n\nVerranno eliminati: schede, sessioni, check-in, misure, messaggi, pesi, feedback, anamnesi.\n\nQuesta operazione è IRREVERSIBILE.`))return;
+  if(!confirm(`Conferma finale: eliminare ${clienteName}?`))return;
+  try{
+    const tables=['sessioni','checkins','check_questionari','pesi_esercizi','feedback_esercizi','promemoria','anamnesi','piani_alimentari'];
+    for(const t of tables){await supa.from(t).delete().eq('cliente_id',clienteId);}
+    await supa.from('messaggi').delete().or(`mittente_id.eq.${clienteId},destinatario_id.eq.${clienteId}`);
+    await supa.from('schede').delete().eq('cliente_id',clienteId);
+    await supa.from('profiles').delete().eq('id',clienteId);
+    toast(`✅ Profilo di ${clienteName} eliminato — spazio liberato`);
+    setTimeout(()=>renderAdminDash(),500);
+  }catch(err){
+    console.error('deleteCliente:',err);
+    toast('❌ Errore eliminazione: '+err.message);
+  }
+}
 async function viewClient(clientId, clientName){
   if(!clientId){toast('❌ ID cliente mancante');return;}
   const modal=document.getElementById('client-modal');
