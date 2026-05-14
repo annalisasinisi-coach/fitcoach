@@ -4327,74 +4327,99 @@ function printScheda(){
 function printSchedaData(s, clienteName){
   if(!s){toast('❌ Nessuna scheda da stampare');return;}
   const giorni=parseGiorni(s.giorni);if(!giorni.length){toast('❌ Nessuna scheda da stampare');return;}
-  const TL={superset:'Superset',triset:'Triset',circuit:'Circuito'};
-  const TC={superset:'#EDE4F7',triset:'#FDE8EE',circuit:'#FFF0E2'};
-  const buildDay=g=>{
-    if(g.tipo==='riposo') return `<section class="day-page rest-page"><header class="day-hdr rest-hdr"><div class="dlabel">${g.label}</div><h2>😴 ${g.nome||'Giorno di Riposo'}</h2>${g.note?`<p class="dnote">${g.note}</p>`:''}</header><p style="text-align:center;padding:40px 20px;color:#C07040;font-size:15px;font-style:italic">Lascia che il corpo si ripari e cresca 💪</p></section>`;
+
+  // Palette colori per giorno (7 toni, uno per giorno)
+  const DAY_PAL=[
+    {a:'#7B3FA0',l:'#F3EAFC',p:'#FAF5FF',t:'#5A2D8A'},  // viola
+    {a:'#E8527A',l:'#FEF0F4',p:'#FFF5F8',t:'#C03060'},  // rosa
+    {a:'#D97706',l:'#FFF8ED',p:'#FFFBF5',t:'#B45309'},  // ambra
+    {a:'#0D9488',l:'#EDFAFA',p:'#F5FFFE',t:'#0F766E'},  // teal
+    {a:'#2563EB',l:'#EFF6FF',p:'#F5F9FF',t:'#1D4ED8'},  // blu
+    {a:'#65A30D',l:'#F3FAE5',p:'#F8FCF0',t:'#4D7C0F'},  // verde
+    {a:'#DC2626',l:'#FEF2F2',p:'#FFF7F7',t:'#B91C1C'},  // rosso
+  ];
+
+  // Colori forti per superserie/triset/circuiti
+  const GRP={
+    superset:{a:'#7B3FA0',l:'#EDE4F7',label:'Superset'},
+    triset:  {a:'#E8527A',l:'#FDEAF1',label:'Triset'},
+    circuit: {a:'#D97706',l:'#FEF3E2',label:'Circuito'},
+  };
+
+  let dayColorIdx=0; // indice colore per i giorni di allenamento (riposo non conta)
+
+  const buildDay=(g,rawIdx)=>{
+    const isRest=g.tipo==='riposo';
+    const dc=isRest?{a:'#C07040',l:'#FFF0E2',p:'#FFF8F0',t:'#9A5020'}:DAY_PAL[dayColorIdx%DAY_PAL.length];
+    if(!isRest)dayColorIdx++;
+
+    if(isRest) return `<section class="day-page rest-page"><header class="day-hdr" style="background:linear-gradient(135deg,${dc.p},${dc.l});border-left-color:${dc.a}"><div class="dlabel" style="color:${dc.a}">${g.label}</div><h2>😴 ${g.nome||'Giorno di Riposo'}</h2>${g.note?`<p class="dnote">${g.note}</p>`:''}</header><p style="text-align:center;padding:40px 16px;color:${dc.a};font-size:14px;font-style:italic">Lascia che il corpo si ripari e cresca 💪</p><footer class="pfooter"><span>Annalisa Sinisi Fit Coach${clienteName?' · '+clienteName:''}</span><span>${g.label}</span></footer></section>`;
+
     const exs=g.esercizi||[];let body='';let rend=new Set();let n=0;
     exs.forEach((ex,i)=>{
       if(rend.has(i))return;n++;
       if(ex.gruppo&&ex.tipoGruppo){
+        const gc=GRP[ex.tipoGruppo]||{a:'#7B3FA0',l:'#EDE4F7',label:ex.tipoGruppo};
         const gIs=exs.map((e,j)=>e.gruppo===ex.gruppo&&e.tipoGruppo===ex.tipoGruppo?j:-1).filter(x=>x>=0);
         if(gIs[0]===i){
-          const bg=TC[ex.tipoGruppo]||'#F7F0FF';
-          body+=`<tr><td colspan="6" class="grp-hdr" style="background:${bg}">⚡ ${TL[ex.tipoGruppo]||ex.tipoGruppo} ${ex.gruppo} — alternare senza recupero intermedio</td></tr>`;
+          body+=`<tr><td colspan="6" class="grp-hdr" style="background:${gc.a};color:#fff">⚡ ${gc.label} ${ex.gruppo} — alternare senza recupero</td></tr>`;
           gIs.forEach((gi,ord)=>{const gx=exs[gi];rend.add(gi);
-            body+=`<tr class="ex-r" style="background:${bg}55"><td class="nc">${ord===0?n:''}</td><td class="namec">${gx.name}</td><td class="vc">${gx.sets||'—'}</td><td class="vc">${gx.reps||'—'}</td><td class="vc">${gx.recupero||'—'}</td><td class="vc rpe-td">${gx.rpe!=null&&gx.rpe!==''?`<span class="rpe-badge">RPE ${gx.rpe}</span>`:''}${gx.tecnica?`<span class="tec-badge">${gx.tecnica}</span>`:''}</td></tr>`;
-            if(gx.note)body+=`<tr class="note-r" style="background:${bg}22"><td></td><td colspan="5" class="notec">📝 ${gx.note}</td></tr>`;
+            body+=`<tr class="ex-r grp-row" style="background:${gc.l}"><td class="nc" style="border-left:4px solid ${gc.a}">${ord===0?n:''}</td><td class="namec">${gx.name}</td><td class="vc">${gx.sets||'—'}</td><td class="vc">${gx.reps||'—'}</td><td class="vc">${gx.recupero||'—'}</td><td class="vc rpe-td">${gx.rpe!=null&&gx.rpe!==''?`<span class="rpe-badge" style="background:${gc.l};color:${gc.a};border:1px solid ${gc.a}">RPE ${gx.rpe}</span>`:''}${gx.tecnica?`<span class="tec-badge" style="background:${gc.a}">${gx.tecnica}</span>`:''}</td></tr>`;
+            if(gx.note)body+=`<tr class="note-r" style="background:${gc.l}"><td style="border-left:4px solid ${gc.a}"></td><td colspan="5" class="notec" style="color:${gc.a}">📝 ${gx.note}</td></tr>`;
           });
         }
       } else {
         rend.add(i);
-        body+=`<tr class="ex-r"><td class="nc">${n}</td><td class="namec">${ex.name}</td><td class="vc">${ex.sets||'—'}</td><td class="vc">${ex.reps||'—'}</td><td class="vc">${ex.recupero||'—'}</td><td class="vc rpe-td">${ex.rpe!=null&&ex.rpe!==''?`<span class="rpe-badge">RPE ${ex.rpe}</span>`:''}${ex.tecnica?`<span class="tec-badge">${ex.tecnica}</span>`:''}</td></tr>`;
+        body+=`<tr class="ex-r"><td class="nc">${n}</td><td class="namec">${ex.name}</td><td class="vc">${ex.sets||'—'}</td><td class="vc">${ex.reps||'—'}</td><td class="vc">${ex.recupero||'—'}</td><td class="vc rpe-td">${ex.rpe!=null&&ex.rpe!==''?`<span class="rpe-badge">${'RPE '+ex.rpe}</span>`:''}${ex.tecnica?`<span class="tec-badge">${ex.tecnica}</span>`:''}</td></tr>`;
         if(ex.note)body+=`<tr class="note-r"><td></td><td colspan="5" class="notec">📝 ${ex.note}</td></tr>`;
       }
     });
     const totS=exs.reduce((a,e)=>a+(parseInt(e.sets)||0),0);
-    return `<section class="day-page"><header class="day-hdr"><div class="dlabel">${g.label}</div><h2>${g.nome||''}</h2><p class="dmeta">${exs.length} esercizi · ${totS} serie totali</p></header>${g.note?`<div class="day-note-box">📋 ${g.note}</div>`:''}<table><thead><tr><th style="width:28px">#</th><th>Esercizio</th><th style="width:46px">Serie</th><th style="width:56px">Rip.</th><th style="width:68px">Rec.</th><th style="width:110px">RPE / Tecnica</th></tr></thead><tbody>${body}</tbody></table><footer class="pfooter"><span>Annalisa Sinisi Fit Coach${clienteName?' · '+clienteName:''}</span><span>${g.label}${g.nome?' — '+g.nome:''}</span></footer></section>`;
+    return `<section class="day-page"><header class="day-hdr" style="background:linear-gradient(135deg,${dc.p},${dc.l});border-left-color:${dc.a}"><div class="dlabel" style="color:${dc.a}">${g.label}</div><h2 style="color:#2D1F14">${g.nome||''}</h2><p class="dmeta">${exs.length} esercizi · ${totS} serie totali</p>${g.note?`<p class="dnote" style="color:${dc.t}">${g.note}</p>`:''}</header><table><thead><tr style="background:${dc.a}"><th style="width:7%">#</th><th style="width:41%">Esercizio</th><th style="width:11%">Serie</th><th style="width:13%">Rip.</th><th style="width:15%">Rec.</th><th>RPE/Tec.</th></tr></thead><tbody>${body}</tbody></table><footer class="pfooter"><span>Annalisa Sinisi Fit Coach${clienteName?' · '+clienteName:''}</span><span style="color:${dc.a};font-weight:700">${g.label}${g.nome?' — '+g.nome:''}</span></footer></section>`;
   };
+
   const srif=parseSettimanaRif(s.giorni);const srifL=srif>0?`Settimana ${srif}`:'';
   const totE=giorni.reduce((t,g)=>t+(g.esercizi||[]).length,0);
   const totS=giorni.reduce((t,g)=>t+(g.esercizi||[]).reduce((a,e)=>a+(parseInt(e.sets)||0),0),0);
   const startDate=s.startDate||s.start_date;
-  const html=`<!DOCTYPE html><html lang="it"><head><meta charset="UTF-8"><title>${s.nome}${clienteName?' — '+clienteName:''}<\/title>
+  const html=`<!DOCTYPE html><html lang="it"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${s.nome}${clienteName?' — '+clienteName:''}<\/title>
 <style>
+@page{margin:10mm 8mm}
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:'Helvetica Neue',Arial,sans-serif;color:#2D1F14;background:#fff;font-size:13px}
-.cover{padding:52px 48px;min-height:100vh;display:flex;flex-direction:column;page-break-after:always;background:linear-gradient(160deg,#fff 60%,#F7EEF5)}
-.logo{font-size:11px;font-weight:800;color:#E8527A;letter-spacing:0.12em;text-transform:uppercase;margin-bottom:64px}
+body{font-family:'Helvetica Neue',Arial,sans-serif;color:#2D1F14;background:#fff;font-size:12px}
+.cover{padding:40px 24px;min-height:100vh;display:flex;flex-direction:column;page-break-after:always;background:linear-gradient(160deg,#fff 60%,#F7EEF5)}
+.logo{font-size:10px;font-weight:800;color:#E8527A;letter-spacing:0.12em;text-transform:uppercase;margin-bottom:48px}
 .cover-body{flex:1;display:flex;flex-direction:column;justify-content:center}
-.cover h1{font-size:34px;font-weight:900;color:#2D1F14;line-height:1.15;margin-bottom:8px}
-.cover .week-badge{display:inline-block;background:#7B3FA0;color:#fff;font-size:11px;font-weight:700;padding:3px 12px;border-radius:20px;margin-bottom:16px;letter-spacing:0.04em}
-.cover .client{font-size:20px;font-weight:700;color:#E8527A;margin-bottom:28px}
-.meta-box{background:#F7EEF5;border-radius:10px;border-left:5px solid #7B3FA0;padding:18px 22px;display:flex;flex-direction:column;gap:8px}
-.meta-row{display:flex;gap:12px;font-size:13px;color:#5A3A80}
-.meta-row strong{min-width:130px;color:#2D1F14}
-.note-globali{margin-top:20px;background:#FDE8EE;border-left:4px solid #E8527A;padding:12px 16px;border-radius:6px;font-size:12px;color:#7B3FA0;font-style:italic}
-.cover-footer{font-size:10px;color:#B8A89A;border-top:1px solid #EDE0D8;padding-top:12px}
-.day-page{padding:32px 48px 24px;page-break-after:always;min-height:100vh;display:flex;flex-direction:column}
+.cover h1{font-size:26px;font-weight:900;color:#2D1F14;line-height:1.2;margin-bottom:8px}
+.cover .week-badge{display:inline-block;background:#7B3FA0;color:#fff;font-size:10px;font-weight:700;padding:3px 12px;border-radius:20px;margin-bottom:12px;letter-spacing:0.04em}
+.cover .client{font-size:16px;font-weight:700;color:#E8527A;margin-bottom:20px}
+.meta-box{background:#F7EEF5;border-radius:10px;border-left:5px solid #7B3FA0;padding:14px 18px;display:flex;flex-direction:column;gap:6px}
+.meta-row{display:flex;gap:10px;font-size:12px;color:#5A3A80}
+.meta-row strong{min-width:110px;color:#2D1F14}
+.note-globali{margin-top:16px;background:#FDE8EE;border-left:4px solid #E8527A;padding:10px 14px;border-radius:6px;font-size:11px;color:#7B3FA0;font-style:italic}
+.cover-footer{font-size:9px;color:#B8A89A;border-top:1px solid #EDE0D8;padding-top:10px;margin-top:16px}
+.day-page{padding:18px 14px 14px;page-break-after:always;min-height:100vh;display:flex;flex-direction:column}
 .day-page:last-child{page-break-after:auto}
-.day-hdr{background:linear-gradient(135deg,#F7EEF5,#FDE8EE);border-radius:10px;padding:16px 20px;margin-bottom:14px;border-left:5px solid #E8527A}
-.rest-page .day-hdr{background:linear-gradient(135deg,#FFF8F0,#FFF0E2);border-left-color:#C07040}
-.dlabel{font-size:10px;font-weight:800;color:#7B3FA0;text-transform:uppercase;letter-spacing:0.12em;margin-bottom:3px}
-.day-hdr h2{font-size:22px;font-weight:800;color:#2D1F14;margin-bottom:3px}
-.dmeta{font-size:11px;color:#9A7A68}
-.dnote{font-size:11px;color:#7B3FA0;font-style:italic;margin-top:4px}
-.day-note-box{background:#F7F0FF;border-left:3px solid #7B3FA0;padding:7px 12px;border-radius:4px;font-size:11px;color:#5A3A80;margin-bottom:12px;font-style:italic}
-table{width:100%;border-collapse:collapse;flex:1}
-thead th{background:#7B3FA0;color:#fff;padding:7px 10px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:0.06em;font-weight:700}
-.ex-r td{padding:7px 10px;border-bottom:1px solid #F0E8E0;vertical-align:middle}
-.ex-r:nth-child(odd) td{background:#FDFBF9}
-.nc{font-weight:700;color:#9A7A68;text-align:center;font-size:11px}
-.namec{font-weight:600;color:#2D1F14;font-size:13px}
-.vc{text-align:center;color:#5A3A80;font-size:12px}
+.day-hdr{border-radius:8px;padding:11px 14px;margin-bottom:10px;border-left:5px solid #E8527A}
+.dlabel{font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:0.12em;margin-bottom:2px}
+.day-hdr h2{font-size:17px;font-weight:800;margin-bottom:2px}
+.dmeta{font-size:10px;color:#9A7A68}
+.dnote{font-size:10px;font-style:italic;margin-top:3px}
+table{width:100%;border-collapse:collapse;table-layout:fixed;flex:1;margin-top:2px}
+thead th{color:#fff;padding:6px 4px;text-align:left;font-size:9px;text-transform:uppercase;letter-spacing:0.04em;font-weight:700}
+.ex-r td{padding:5px 4px;border-bottom:1px solid #F0E8E0;vertical-align:middle}
+.ex-r:not(.grp-row):nth-child(odd) td{background:#FDFBF9}
+.grp-row td{padding:5px 4px;border-bottom:1px solid rgba(0,0,0,0.07);vertical-align:middle}
+.nc{font-weight:700;color:#9A7A68;text-align:center;font-size:10px}
+.namec{font-weight:600;color:#2D1F14;font-size:11px;word-break:break-word}
+.vc{text-align:center;color:#5A3A80;font-size:11px}
 .rpe-td{vertical-align:middle}
-.rpe-badge{display:inline-block;background:#F7EEF5;color:#7B3FA0;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;margin:1px 2px}
-.tec-badge{display:inline-block;background:#7B3FA0;color:#fff;font-size:9px;font-weight:700;padding:2px 7px;border-radius:10px;margin:1px 2px;letter-spacing:0.02em}
-.grp-hdr td,.grp-hdr{font-size:10px;font-weight:700;color:#5A3A80;letter-spacing:0.06em;text-transform:uppercase;padding:5px 10px 3px}
+.rpe-badge{display:inline-block;background:#F7EEF5;color:#7B3FA0;font-size:9px;font-weight:700;padding:2px 5px;border-radius:8px;margin:1px}
+.tec-badge{display:inline-block;background:#7B3FA0;color:#fff;font-size:8px;font-weight:700;padding:2px 5px;border-radius:8px;margin:1px;word-break:break-word;white-space:normal}
+.grp-hdr{font-size:9px;font-weight:700;letter-spacing:0.05em;text-transform:uppercase;padding:5px 8px 4px;color:#fff}
 .note-r td{border-bottom:none}
-.notec{font-size:10px;color:#9A7A68;font-style:italic;padding:2px 10px 6px}
-.pfooter{display:flex;justify-content:space-between;font-size:10px;color:#B8A89A;border-top:1px solid #EDE0D8;padding-top:10px;margin-top:auto;padding-top:16px}
+.notec{font-size:9px;font-style:italic;padding:2px 6px 5px;color:#9A7A68}
+.pfooter{display:flex;justify-content:space-between;align-items:center;font-size:9px;color:#B8A89A;border-top:1px solid #EDE0D8;margin-top:auto;padding-top:10px}
 @media print{*{-webkit-print-color-adjust:exact;print-color-adjust:exact}.day-page{page-break-after:always}.cover{page-break-after:always}}
 <\/style><\/head><body>
 <div class="cover">
@@ -4414,7 +4439,7 @@ thead th{background:#7B3FA0;color:#fff;padding:7px 10px;text-align:left;font-siz
   </div>
   <div class="cover-footer">Generato il ${new Date().toLocaleDateString('it-IT',{day:'numeric',month:'long',year:'numeric'})} · annalisasinisi.coach</div>
 </div>
-${giorni.map(g=>buildDay(g)).join('')}
+${giorni.map((g,i)=>buildDay(g,i)).join('')}
 <\/body><\/html>`;
   const win=window.open('','_blank');
   if(!win){toast('❌ Abilita i popup per stampare');return;}
