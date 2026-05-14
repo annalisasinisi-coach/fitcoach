@@ -1298,6 +1298,28 @@ async function changePassword(){
   toast('✅ Password aggiornata con successo!');
 }
 
+// ── AUTO-CLEANUP: rimuove dati vecchi >2 anni una volta al mese ──
+async function runAutoCleanup(){
+  const CLEANUP_KEY='asfc4_last_cleanup';
+  const last=localStorage.getItem(CLEANUP_KEY);
+  const now=Date.now();
+  if(last && (now-parseInt(last)) < 30*24*60*60*1000) return;
+  const cutoff=new Date(now - 2*365*24*60*60*1000).toISOString();
+  try{
+    // feedback_esercizi: mai letti dal DB — eliminazione sicura
+    await supa.from('feedback_esercizi').delete().lt('created_at',cutoff);
+    // messaggi vecchi: dopo 2 anni non servono
+    await supa.from('messaggi').delete().lt('created_at',cutoff);
+    // sessioni vecchie: oltre 2 anni non servono per progressi o grafici
+    if(role==='admin'||role==='coach'){
+      await supa.from('sessioni').delete().lt('data_sessione',cutoff.slice(0,10));
+    }
+    localStorage.setItem(CLEANUP_KEY, String(now));
+    console.log('[CLEANUP] completato, cutoff:',cutoff.slice(0,10));
+  }catch(e){
+    console.warn('[CLEANUP] Errore (non critico):',e.message);
+  }
+}
 async function afterLogin(supaUser) {
   // Fetch own profile (RLS: can only read own row)
   let userProf = null;
@@ -1366,6 +1388,8 @@ async function afterLogin(supaUser) {
   // Reset notification state for fresh session
   notifState.counts={};sectionLastVisit={};lastPollTime=null;_realtimeInitialized=false;
   startPolling();
+  // Cleanup automatico dati vecchi — gira in background, non blocca il login
+  setTimeout(()=>runAutoCleanup(), 5000);
 }
 
 async function doLogout(){
@@ -3520,7 +3544,7 @@ async function loadAdminQuestionariData() {
     });
   }
   // Load real check questionari
-  const {data:ckData,error:ckErr}=await supa.from('check_questionari').select('*, profiles(nome,cognome,email)').order('created_at',{ascending:false}).order('id',{ascending:false}).limit(500);
+  const {data:ckData,error:ckErr}=await supa.from('check_questionari').select('*, profiles(nome,cognome,email)').order('created_at',{ascending:false}).order('id',{ascending:false}).limit(100);
   if(ckData?.length){
     ckData.forEach(c=>{
       const name=((c.profiles?.nome||'')+(c.profiles?.cognome?' '+c.profiles.cognome:'')).trim()||c.profiles?.email||'Cliente';
@@ -3871,13 +3895,14 @@ async function viewClient(clientId, clientName){
   mc.innerHTML='<div style="text-align:center;padding:30px;color:var(--text2)">⏳ Caricamento...</div>';
   modal.style.display='block';
   try{
-    const [{data:prof},{data:ci},{data:scheda},{data:pesi},{data:feedbacks},{data:piano}]=await Promise.all([
+    const [{data:prof},{data:ci},{data:scheda},{data:pesi},{data:feedbacks},{data:piano},{data:questionari}]=await Promise.all([
       supa.from('profiles').select('*').eq('id',clientId).maybeSingle(),
-      supa.from('checkins').select('*').eq('cliente_id',clientId).order('created_at',{ascending:false}).limit(5),
+      supa.from('checkins').select('*').eq('cliente_id',clientId).order('created_at',{ascending:false}).limit(24),
       supa.from('schede').select('*').eq('cliente_id',clientId).eq('attiva',true).order('created_at',{ascending:true}),
-      supa.from('pesi_esercizi').select('*').eq('cliente_id',clientId).order('data_registrazione',{ascending:false}).limit(20),
-      supa.from('feedback_esercizi').select('*').eq('cliente_id',clientId).order('created_at',{ascending:false}).limit(10),
-      supa.from('piani_alimentari').select('*').eq('cliente_id',clientId).order('updated_at',{ascending:false}).limit(1)
+      supa.from('pesi_esercizi').select('*').eq('cliente_id',clientId).order('data_registrazione',{ascending:false}).limit(100),
+      supa.from('feedback_esercizi').select('*').eq('cliente_id',clientId).order('created_at',{ascending:false}).limit(50),
+      supa.from('piani_alimentari').select('*').eq('cliente_id',clientId).order('updated_at',{ascending:false}).limit(1),
+      supa.from('check_questionari').select('*').eq('cliente_id',clientId).order('created_at',{ascending:false}).limit(24)
     ]);
     console.log('viewClient data:', {prof,ci:ci?.length,scheda:scheda?.length,pesi:pesi?.length,feedbacks:feedbacks?.length,piano:piano?.length});
     window._lastSchedaCoach = scheda?.[0] || null;
