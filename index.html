@@ -4348,6 +4348,14 @@ function printSchedaData(s, clienteName){
 
   let dayColorIdx=0; // indice colore per i giorni di allenamento (riposo non conta)
 
+  // Lookup YouTube short URL from libreria globale
+  const getYtUrl=name=>{
+    const lib=exerciseLibrary.find(e=>e.name===name);
+    if(!lib?.video)return '';
+    const m=lib.video.match(/embed\/([^?&]+)/);
+    return m?`https://youtu.be/${m[1]}`:'';
+  };
+
   const buildDay=(g,rawIdx)=>{
     const isRest=g.tipo==='riposo';
     const dc=isRest?{a:'#C07040',l:'#FFF0E2',p:'#FFF8F0',t:'#9A5020'}:DAY_PAL[dayColorIdx%DAY_PAL.length];
@@ -4363,14 +4371,14 @@ function printSchedaData(s, clienteName){
         const gIs=exs.map((e,j)=>e.gruppo===ex.gruppo&&e.tipoGruppo===ex.tipoGruppo?j:-1).filter(x=>x>=0);
         if(gIs[0]===i){
           body+=`<tr><td colspan="6" class="grp-hdr" style="background:${gc.a};color:#fff">⚡ ${gc.label} ${ex.gruppo} — alternare senza recupero</td></tr>`;
-          gIs.forEach((gi,ord)=>{const gx=exs[gi];rend.add(gi);
-            body+=`<tr class="ex-r grp-row" style="background:${gc.l}"><td class="nc" style="border-left:4px solid ${gc.a}">${ord===0?n:''}</td><td class="namec">${gx.name}</td><td class="vc">${gx.sets||'—'}</td><td class="vc">${gx.reps||'—'}</td><td class="vc">${gx.recupero||'—'}</td><td class="vc rpe-td">${gx.rpe!=null&&gx.rpe!==''?`<span class="rpe-badge" style="background:${gc.l};color:${gc.a};border:1px solid ${gc.a}">RPE ${gx.rpe}</span>`:''}${gx.tecnica?`<span class="tec-badge" style="background:${gc.a}">${gx.tecnica}</span>`:''}</td></tr>`;
+          gIs.forEach((gi,ord)=>{const gx=exs[gi];rend.add(gi);const ytG=getYtUrl(gx.name);
+            body+=`<tr class="ex-r grp-row" style="background:${gc.l}"><td class="nc" style="border-left:4px solid ${gc.a}">${ord===0?n:''}</td><td class="namec">${gx.name}${ytG?`<br><a class="yt-link" href="${ytG}" target="_blank">🎥 ${ytG}</a>`:''}</td><td class="vc">${gx.sets||'—'}</td><td class="vc">${gx.reps||'—'}</td><td class="vc">${gx.recupero||'—'}</td><td class="vc rpe-td">${gx.rpe!=null&&gx.rpe!==''?`<span class="rpe-badge" style="background:${gc.l};color:${gc.a};border:1px solid ${gc.a}">RPE ${gx.rpe}</span>`:''}${gx.tecnica?`<span class="tec-badge" style="background:${gc.a}">${gx.tecnica}</span>`:''}</td></tr>`;
             if(gx.note)body+=`<tr class="note-r" style="background:${gc.l}"><td style="border-left:4px solid ${gc.a}"></td><td colspan="5" class="notec" style="color:${gc.a}">📝 ${gx.note}</td></tr>`;
           });
         }
       } else {
         rend.add(i);
-        body+=`<tr class="ex-r"><td class="nc">${n}</td><td class="namec">${ex.name}</td><td class="vc">${ex.sets||'—'}</td><td class="vc">${ex.reps||'—'}</td><td class="vc">${ex.recupero||'—'}</td><td class="vc rpe-td">${ex.rpe!=null&&ex.rpe!==''?`<span class="rpe-badge">${'RPE '+ex.rpe}</span>`:''}${ex.tecnica?`<span class="tec-badge">${ex.tecnica}</span>`:''}</td></tr>`;
+        const ytS=getYtUrl(ex.name);body+=`<tr class="ex-r"><td class="nc">${n}</td><td class="namec">${ex.name}${ytS?`<br><a class="yt-link" href="${ytS}" target="_blank">🎥 ${ytS}</a>`:''}</td><td class="vc">${ex.sets||'—'}</td><td class="vc">${ex.reps||'—'}</td><td class="vc">${ex.recupero||'—'}</td><td class="vc rpe-td">${ex.rpe!=null&&ex.rpe!==''?`<span class="rpe-badge">${'RPE '+ex.rpe}</span>`:''}${ex.tecnica?`<span class="tec-badge">${ex.tecnica}</span>`:''}</td></tr>`;
         if(ex.note)body+=`<tr class="note-r"><td></td><td colspan="5" class="notec">📝 ${ex.note}</td></tr>`;
       }
     });
@@ -4407,13 +4415,14 @@ body{font-family:'Helvetica Neue',Arial,sans-serif;color:#2D1F14;background:#fff
 .dnote{font-size:10px;font-style:italic;margin-top:3px}
 table{width:100%;border-collapse:collapse;table-layout:fixed;flex:1;margin-top:2px}
 thead th{color:#fff;padding:6px 4px;text-align:left;font-size:9px;text-transform:uppercase;letter-spacing:0.04em;font-weight:700}
-.ex-r td{padding:5px 4px;border-bottom:1px solid #F0E8E0;vertical-align:middle}
+.ex-r td{padding:3px 4px;border-bottom:1px solid #F0E8E0;vertical-align:middle}
 .ex-r:not(.grp-row):nth-child(odd) td{background:#FDFBF9}
-.grp-row td{padding:5px 4px;border-bottom:1px solid rgba(0,0,0,0.07);vertical-align:middle}
+.grp-row td{padding:3px 4px;border-bottom:1px solid rgba(0,0,0,0.07);vertical-align:middle}
 .nc{font-weight:700;color:#9A7A68;text-align:center;font-size:10px}
-.namec{font-weight:600;color:#2D1F14;font-size:11px;word-break:break-word}
-.vc{text-align:center;color:#5A3A80;font-size:11px}
+.namec{font-weight:600;color:#2D1F14;font-size:10px;word-break:break-word;line-height:1.3}
+.vc{text-align:center;color:#5A3A80;font-size:10px}
 .rpe-td{vertical-align:middle}
+.yt-link{font-size:8px;color:#CC0000;text-decoration:none;font-weight:400;word-break:break-all;display:block;margin-top:1px}
 .rpe-badge{display:inline-block;background:#F7EEF5;color:#7B3FA0;font-size:9px;font-weight:700;padding:2px 5px;border-radius:8px;margin:1px}
 .tec-badge{display:inline-block;background:#7B3FA0;color:#fff;font-size:8px;font-weight:700;padding:2px 5px;border-radius:8px;margin:1px;word-break:break-word;white-space:normal}
 .grp-hdr{font-size:9px;font-weight:700;letter-spacing:0.05em;text-transform:uppercase;padding:5px 8px 4px;color:#fff}
