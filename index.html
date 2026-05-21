@@ -1327,11 +1327,11 @@ async function afterLogin(supaUser) {
   if(profiles?.length){
     userProf=profiles[0];
   } else {
-    // Profile doesn't exist yet (new registration) — create it
-    const {data:newProf}=await supa.from('profiles').insert({
-      id:supaUser.id,email:supaUser.email,role:'cliente'
-    }).select().maybeSingle();
-    userProf=newProf||{id:supaUser.id,email:supaUser.email,role:'cliente'};
+    // Nessun profilo trovato: utente eliminato dalla coach o account non ancora configurato
+    // NON ricreare il profilo — blocca l'accesso
+    await supa.auth.signOut();
+    showLoginError('Account non trovato. Contatta la tua coach per ripristinare l\u2019accesso.');
+    return;
   }
   userProfile = userProf;
   user = {name:(userProfile.nome||'')+' '+(userProfile.cognome||''), role:userProfile.role, id:supaUser.id, email:supaUser.email, loginTime:new Date().toISOString()};
@@ -3880,8 +3880,10 @@ async function deleteCliente(clienteId, clienteName){
     await supa.from('messaggi').delete().or(`mittente_id.eq.${clienteId},destinatario_id.eq.${clienteId}`);
     await supa.from('schede').delete().eq('cliente_id',clienteId);
     await supa.from('profiles').delete().eq('id',clienteId);
-    toast(`✅ Profilo di ${clienteName} eliminato — spazio liberato`);
-    setTimeout(()=>renderAdminDash(),500);
+    // Rimuovi dalla lista in memoria così la dashboard si aggiorna subito senza re-fetch
+    clientiList = clientiList.filter(c => c.id !== clienteId);
+    toast(`✅ Profilo di ${clienteName} eliminato`);
+    renderAdminDash();
   }catch(err){
     console.error('deleteCliente:',err);
     toast('❌ Errore eliminazione: '+err.message);
