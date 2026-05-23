@@ -1002,16 +1002,19 @@ input,textarea,select{font-family:'DM Sans',sans-serif}
       <div class="page" id="page-admin-questionari">
         <div class="page-title">Questionari clienti</div>
         <div class="page-sub">Visualizza le risposte di anamnesi e check-in mensili</div>
-        <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;flex-wrap:wrap">
-          <div style="font-size:13px;font-weight:500;color:var(--text2)">Cliente:</div>
-          <div style="display:flex;gap:6px;flex-wrap:wrap" id="q-client-tabs"></div>
-          <div style="margin-left:auto;display:flex;gap:8px">
+        <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:16px">
+          <div style="position:relative;flex:1;min-width:180px;max-width:280px">
+            <span style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--text3);font-size:13px;pointer-events:none">🔍</span>
+            <input id="q-search" type="text" placeholder="Cerca cliente..." oninput="filterQClients()" style="width:100%;padding:8px 10px 8px 30px;border:1.5px solid var(--border);border-radius:var(--r2);background:var(--bg2);color:var(--text);font-size:13px;outline:none">
+          </div>
+          <div id="q-client-tabs" style="flex:1;min-width:160px"></div>
+          <div style="display:flex;gap:8px">
             <button class="day-tab active" id="q-type-anamnesi" onclick="switchQType('anamnesi',this)">📋 Anamnesi</button>
             <button class="day-tab" id="q-type-check" onclick="switchQType('check',this)">📊 Check mensili</button>
           </div>
         </div>
-        <div id="admin-q-anamnesi"><div id="admin-anamnesi-content"></div></div>
-        <div id="admin-q-check" style="display:none"><div id="admin-check-content"></div></div>
+        <div id="admin-q-anamnesi"><div id="admin-anamnesi-content" style="max-height:65vh;overflow-y:auto;padding-right:2px"></div></div>
+        <div id="admin-q-check" style="display:none"><div id="admin-check-content" style="max-height:65vh;overflow-y:auto;padding-right:2px"></div></div>
       </div>
 
     </main>
@@ -3458,62 +3461,80 @@ function simAdminAttach(type){
 // ── FEEDBACK ESERCIZI ADMIN ──
 let _feedbackAll=[];
 let _feedbackClienteId='';
-async function renderAdminFeedback(){
+let _feedbackAllNames=[];
+function filterFeedbackClients(){
+  const q=(document.getElementById('fb-search')?.value||'').toLowerCase();
+  const filtered=_feedbackAllNames.filter(([id,n])=>!q||n.toLowerCase().includes(q));
+  const sel=document.getElementById('fb-select');if(!sel)return;
+  sel.innerHTML=filtered.map(([id,n])=>`<option value="${id}" ${id===_feedbackClienteId?'selected':''}>${n}</option>`).join('');
+  if(filtered.length&&!filtered.some(([id])=>id===_feedbackClienteId)){
+    _feedbackClienteId=filtered[0][0];renderAdminFeedback(true);
+  }
+}
+async function renderAdminFeedback(skipRebuild){
   const el=document.getElementById('admin-feedback-list');
   if(!el)return;
-  const {data:fbs,error:fbErr}=await supa.from('feedback_esercizi')
-    .select('*, profiles(nome,cognome,email)')
-    .order('created_at',{ascending:false})
-    .limit(200);
-  if(!fbs?.length){
-    el.innerHTML='<div class="card" style="text-align:center;padding:40px;color:var(--text2)"><div style="font-size:40px;margin-bottom:12px">💬</div><div>Nessun feedback ricevuto ancora</div></div>';
+  if(!skipRebuild){
+    const {data:fbs,error:fbErr}=await supa.from('feedback_esercizi')
+      .select('*, profiles(nome,cognome,email)')
+      .order('created_at',{ascending:false})
+      .limit(200);
+    if(!fbs?.length){
+      el.innerHTML='<div class="card" style="text-align:center;padding:40px;color:var(--text2)"><div style="font-size:40px;margin-bottom:12px">💬</div><div>Nessun feedback ricevuto ancora</div></div>';
+      return;
+    }
+    _feedbackAll=fbs;
+    const clientiMap={};
+    fbs.forEach(f=>{
+      if(!clientiMap[f.cliente_id]){
+        const p=f.profiles;
+        clientiMap[f.cliente_id]=p?((p.nome||'')+(p.cognome?' '+p.cognome:'')).trim()||p.email:'Cliente';
+      }
+    });
+    _feedbackAllNames=Object.entries(clientiMap);
+    if(!_feedbackClienteId||!clientiMap[_feedbackClienteId]) _feedbackClienteId=_feedbackAllNames[0]?.[0]||'';
+    // Render header con search + select
+    el.innerHTML=`<div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
+      <div style="position:relative;flex:1;min-width:160px;max-width:260px">
+        <span style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--text3);font-size:13px;pointer-events:none">🔍</span>
+        <input id="fb-search" type="text" placeholder="Cerca cliente..." oninput="filterFeedbackClients()" style="width:100%;padding:8px 10px 8px 30px;border:1.5px solid var(--border);border-radius:var(--r2);background:var(--bg2);color:var(--text);font-size:13px;outline:none">
+      </div>
+      <select id="fb-select" onchange="_feedbackClienteId=this.value;renderAdminFeedback(true)" style="flex:1;min-width:160px;padding:8px 14px;border:1.5px solid var(--border);border-radius:var(--r2);background:var(--bg2);color:var(--text);font-size:13px;font-family:inherit;outline:none">
+        ${_feedbackAllNames.map(([id,n])=>`<option value="${id}" ${id===_feedbackClienteId?'selected':''}}>${n}</option>`).join('')}
+      </select>
+    </div><div id="fb-cards"></div>`;
+  }
+  // Render cards per cliente selezionata
+  const cardsEl=document.getElementById('fb-cards');if(!cardsEl)return;
+  const filtered=(_feedbackAll||[]).filter(f=>f.cliente_id===_feedbackClienteId);
+  if(!filtered.length){
+    cardsEl.innerHTML='<div style="font-size:13px;color:var(--text3);padding:20px;text-align:center">Nessun feedback da questa cliente</div>';
     return;
   }
-  _feedbackAll=fbs;
-  // Clienti uniche
-  const clientiMap={};
-  fbs.forEach(f=>{
-    if(!clientiMap[f.cliente_id]){
-      const p=f.profiles;
-      clientiMap[f.cliente_id]=p?((p.nome||'')+(p.cognome?' '+p.cognome:'')).trim()||p.email:'Cliente';
-    }
+  const byEx={};
+  filtered.forEach(f=>{
+    const k=f.esercizio_key||'Altro';
+    if(!byEx[k])byEx[k]=[];
+    byEx[k].push(f);
   });
-  if(!_feedbackClienteId||!clientiMap[_feedbackClienteId]) _feedbackClienteId=Object.keys(clientiMap)[0]||'';
-  const opts=Object.entries(clientiMap).map(([id,name])=>`<option value="${id}" ${id===_feedbackClienteId?'selected':''}>${name}</option>`).join('');
-  const filtered=fbs.filter(f=>f.cliente_id===_feedbackClienteId);
-  // Raggruppa per esercizio
-  let cards;
-  if(filtered.length){
-    const byEx={};
-    filtered.forEach(f=>{
-      const k=f.esercizio_key||'Altro';
-      if(!byEx[k])byEx[k]=[];
-      byEx[k].push(f);
-    });
-    cards=Object.entries(byEx).map(([ex,items])=>`
-      <details style="margin-bottom:5px;border:1px solid var(--border);border-radius:var(--r2);overflow:hidden">
-        <summary style="padding:8px 12px;cursor:pointer;background:var(--warm);list-style:none;display:flex;align-items:center;justify-content:space-between;user-select:none">
-          <span style="font-size:13px;font-weight:600">${ex}</span>
-          <span style="font-size:11px;color:var(--text3)">${items.length} feedback ▼</span>
-        </summary>
-        <div style="padding:6px 12px;background:var(--bg2)">
-          ${items.map(f=>{
-            const date=new Date(f.created_at).toLocaleDateString('it-IT',{day:'numeric',month:'short'});
-            return `<div style="font-size:12px;padding:5px 0;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;gap:8px">
-              <span>${f.emoji||''} ${f.testo?'"'+f.testo+'"':'<em style="color:var(--text3)">Solo emoji</em>'}</span>
-              <span style="color:var(--text3);white-space:nowrap">${date}</span>
-            </div>`;
-          }).join('')}
-        </div>
-      </details>`).join('');
-  } else {
-    cards=`<div style="font-size:13px;color:var(--text3);padding:20px;text-align:center">Nessun feedback da questa cliente</div>`;
-  }
-  el.innerHTML=`<div style="margin-bottom:12px">
-    <select onchange="_feedbackClienteId=this.value;renderAdminFeedback()" style="width:100%;padding:9px 14px;border:1.5px solid var(--border);border-radius:var(--r2);background:var(--bg2);color:var(--text);font-size:13px;font-family:inherit">
-      ${opts}
-    </select>
-  </div>${cards}`;
+  cardsEl.innerHTML=`<div style="max-height:62vh;overflow-y:auto;padding-right:2px">
+    ${Object.entries(byEx).map(([ex,items])=>`
+    <details style="margin-bottom:5px;border:1px solid var(--border);border-radius:var(--r2);overflow:hidden">
+      <summary style="padding:8px 12px;cursor:pointer;background:var(--warm);list-style:none;display:flex;align-items:center;justify-content:space-between;user-select:none">
+        <span style="font-size:13px;font-weight:600">${ex}</span>
+        <span style="font-size:11px;color:var(--text3)">${items.length} feedback ▼</span>
+      </summary>
+      <div style="padding:6px 12px;background:var(--bg2)">
+        ${items.map(f=>{
+          const date=new Date(f.created_at).toLocaleDateString('it-IT',{day:'numeric',month:'short'});
+          return `<div style="font-size:12px;padding:5px 0;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;gap:8px">
+            <span>${f.emoji||''} ${f.testo?'"'+ f.testo+'"':'<em style="color:var(--text3)">Solo emoji</em>'}</span>
+            <span style="color:var(--text3);white-space:nowrap">${date}</span>
+          </div>`;
+        }).join('')}
+      </div>
+    </details>`).join('')}
+  </div>`;
 }
 
 // ── ANALYTICS ──
@@ -3562,16 +3583,23 @@ async function loadAdminQuestionariData() {
     if(!DEMO_ANAMNESI[c.name]) DEMO_ANAMNESI[c.name]=null;
   });
 }
+// nomi filtrati per il select questionari
+let _qAllNames = [];
+function filterQClients(){
+  const q=(document.getElementById('q-search')?.value||'').toLowerCase();
+  const filtered=_qAllNames.filter(n=>!q||n.toLowerCase().includes(q));
+  const tabs=document.getElementById('q-client-tabs');
+  if(!tabs)return;
+  tabs.innerHTML=`<select onchange="qSelectedClient=this.value;renderQContent()" style="width:100%;padding:8px 14px;border:1.5px solid var(--border);border-radius:var(--r2);background:var(--bg2);color:var(--text);font-size:13px;outline:none">
+    ${filtered.map(n=>`<option value="${n}" ${n===qSelectedClient?'selected':''}>${n}</option>`).join('')}
+  </select>`;
+  if(filtered.length&&!filtered.includes(qSelectedClient)){qSelectedClient=filtered[0];renderQContent();}
+}
 async function renderAdminQuestionari() {
   await loadAdminQuestionariData();
-  // Build client tabs
-  const names = Object.keys(DEMO_ANAMNESI).filter(n=>DEMO_ANAMNESI[n]!==null||DEMO_CHECKS[n]?.length);
-  const tabs=document.getElementById('q-client-tabs');
-  // Replace tabs with a select dropdown
-  tabs.innerHTML=`<select onchange="qSelectedClient=this.value;renderQContent()" style="background:var(--card);border:1.5px solid var(--border);border-radius:var(--r);padding:8px 14px;color:var(--text);font-size:13px;outline:none;min-width:180px">
-    ${names.map(n=>`<option value="${n}" ${n===qSelectedClient?'selected':''}>${n}</option>`).join('')}
-  </select>`;
-  if(!qSelectedClient && names.length) qSelectedClient=names[0];
+  _qAllNames = Object.keys(DEMO_ANAMNESI).filter(n=>DEMO_ANAMNESI[n]!==null||DEMO_CHECKS[n]?.length);
+  if(!qSelectedClient && _qAllNames.length) qSelectedClient=_qAllNames[0];
+  filterQClients();
   renderQContent();
 }
 
@@ -3921,7 +3949,7 @@ async function viewClient(clientId, clientName){
     // Scheda — tutte le settimane, ordinate per settimana_rif
     window._profiloSchedeMap=window._profiloSchedeMap||{};
     const _schedeOrd=(scheda||[]).map(s=>({...s,_srif:parseSettimanaRif(s.giorni)})).sort((a,b)=>(a._srif||999)-(b._srif||999));
-    html+=`<details style="margin-bottom:14px;border:1.5px solid rgba(123,63,160,0.18);border-radius:var(--r2);overflow:hidden"><summary style="padding:10px 14px;cursor:pointer;background:linear-gradient(135deg,var(--violet-pale),var(--rose-pale));list-style:none;display:flex;justify-content:space-between;align-items:center;user-select:none;font-size:11px;text-transform:uppercase;letter-spacing:0.06em;color:var(--text3);font-weight:600"><span>📋 SCHEDE (${_schedeOrd.length})</span><span style="font-size:13px">▼</span></summary><div style="padding:10px 14px;background:var(--bg2)">`;
+    html+=`<details style="margin-bottom:14px;border:1.5px solid rgba(123,63,160,0.18);border-radius:var(--r2);overflow:hidden"><summary style="padding:10px 14px;cursor:pointer;background:linear-gradient(135deg,var(--violet-pale),var(--rose-pale));list-style:none;display:flex;justify-content:space-between;align-items:center;user-select:none;font-size:11px;text-transform:uppercase;letter-spacing:0.06em;color:var(--text3);font-weight:600"><span>📋 SCHEDE (${_schedeOrd.length})</span><span style="font-size:13px">▼</span></summary><div style="padding:10px 14px;background:var(--bg2);max-height:55vh;overflow-y:auto">`;
     if(_schedeOrd.length){
       _schedeOrd.forEach(s=>{
         window._profiloSchedeMap[s.id]=s;
@@ -3939,7 +3967,7 @@ async function viewClient(clientId, clientName){
     html+='</div></details>';
     // Volume per gruppo muscolare per ogni scheda (solo se ci sono schede)
     if(_schedeOrd.length){
-      html+=`<details style="margin-bottom:14px;border:1.5px solid rgba(232,82,122,0.18);border-radius:var(--r2);overflow:hidden"><summary style="padding:10px 14px;cursor:pointer;background:linear-gradient(135deg,var(--rose-pale),var(--peach-pale));list-style:none;display:flex;justify-content:space-between;align-items:center;user-select:none;font-size:11px;text-transform:uppercase;letter-spacing:0.06em;color:var(--text3);font-weight:600"><span>📊 VOLUME PER GRUPPO MUSCOLARE</span><span style="font-size:13px">▼</span></summary><div style="padding:10px 14px;background:var(--bg2)">`;
+      html+=`<details style="margin-bottom:14px;border:1.5px solid rgba(232,82,122,0.18);border-radius:var(--r2);overflow:hidden"><summary style="padding:10px 14px;cursor:pointer;background:linear-gradient(135deg,var(--rose-pale),var(--peach-pale));list-style:none;display:flex;justify-content:space-between;align-items:center;user-select:none;font-size:11px;text-transform:uppercase;letter-spacing:0.06em;color:var(--text3);font-weight:600"><span>📊 VOLUME PER GRUPPO MUSCOLARE</span><span style="font-size:13px">▼</span></summary><div style="padding:10px 14px;background:var(--bg2);max-height:280px;overflow-y:auto">`;
       _schedeOrd.forEach(s=>{
         const srifLabel=s._srif>0?'Settimana '+s._srif:'Generale';
         const giorniArr=parseGiorni(s.giorni);
@@ -3962,7 +3990,7 @@ async function viewClient(clientId, clientName){
       <summary style="padding:10px 14px;cursor:pointer;background:var(--warm);font-size:11px;text-transform:uppercase;letter-spacing:0.06em;color:var(--text3);font-weight:600;list-style:none;display:flex;justify-content:space-between;align-items:center">
         <span>📊 CHECK-IN (${ci?.length||0})</span><span style="font-size:12px">▼</span>
       </summary>
-      <div style="padding:10px 14px;background:var(--bg2)">`;
+      <div style="padding:10px 14px;background:var(--bg2);max-height:260px;overflow-y:auto">`;
     if(ci?.length){ci.forEach(c=>{html+=`<details style="margin-bottom:6px;border:1px solid var(--border);border-radius:var(--r);overflow:hidden">
       <summary style="padding:8px 12px;cursor:pointer;background:var(--warm);font-size:12px;font-weight:600;list-style:none;display:flex;justify-content:space-between">
         <span>${new Date(c.data_checkin).toLocaleDateString('it-IT')}</span>
@@ -4014,11 +4042,17 @@ async function viewClient(clientId, clientName){
     }
     // Pesi — raggruppati per esercizio, collapsibili
     const byExAll={};pesi?.forEach(p=>{if(!byExAll[p.esercizio_nome])byExAll[p.esercizio_nome]=[];byExAll[p.esercizio_nome].push({kg:p.kg,data:p.data_registrazione});});
+    const pesiId='pesi-'+clientId;
     html+=`<details style="margin-bottom:16px;border:1.5px solid var(--border);border-radius:var(--r2);overflow:hidden">
       <summary style="padding:10px 14px;cursor:pointer;background:var(--warm);font-size:11px;text-transform:uppercase;letter-spacing:0.06em;color:var(--text3);font-weight:600;list-style:none;display:flex;justify-content:space-between;align-items:center">
         <span>💪 PESI REGISTRATI (${Object.keys(byExAll).length} esercizi)</span><span style="font-size:12px">▼</span>
       </summary>
-      <div style="padding:10px 14px;background:var(--bg2)">`;
+      <div style="padding:10px 14px;background:var(--bg2)">
+        <div style="position:relative;margin-bottom:10px">
+          <span style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--text3);font-size:13px;pointer-events:none">🔍</span>
+          <input id="${pesiId}" type="text" placeholder="Filtra esercizio..." oninput="filterPesiModal('${clientId}')" style="width:100%;padding:7px 10px 7px 30px;border:1.5px solid var(--border);border-radius:var(--r2);background:var(--card);color:var(--text);font-size:12px;outline:none">
+        </div>
+        <div id="pesi-list-${clientId}" style="max-height:260px;overflow-y:auto;padding-right:2px">`;
     if(Object.keys(byExAll).length){Object.entries(byExAll).forEach(([ex,records])=>{
       const last=records[0];const best=Math.max(...records.map(r=>r.kg));
       html+=`<details style="margin-bottom:6px;border:1px solid var(--border);border-radius:var(--r);overflow:hidden">
@@ -4030,13 +4064,14 @@ async function viewClient(clientId, clientName){
         </div></details>`;
     });}
     else html+=`<div style="font-size:13px;color:var(--text3);font-style:italic;padding:8px 0">Nessun peso registrato</div>`;
-    html+='</div></details>';
+    html+='</div></div></details>';
     // Feedback — collapsibili per data
     html+=`<details style="margin-bottom:16px;border:1.5px solid var(--border);border-radius:var(--r2);overflow:hidden">
       <summary style="padding:10px 14px;cursor:pointer;background:var(--warm);font-size:11px;text-transform:uppercase;letter-spacing:0.06em;color:var(--text3);font-weight:600;list-style:none;display:flex;justify-content:space-between;align-items:center">
         <span>💬 FEEDBACK ALLENAMENTO (${feedbacks?.length||0})</span><span style="font-size:12px">▼</span>
       </summary>
-      <div style="padding:10px 14px;background:var(--bg2)">`;
+      <div style="padding:10px 14px;background:var(--bg2)">
+        <div style="max-height:260px;overflow-y:auto;padding-right:2px">`;
     if(feedbacks?.length){
       const fbByEx={};
       feedbacks.forEach(f=>{if(!fbByEx[f.esercizio_key])fbByEx[f.esercizio_key]=[];fbByEx[f.esercizio_key].push(f);});
@@ -4054,9 +4089,19 @@ async function viewClient(clientId, clientName){
           </div>
         </details>`).join('');
     } else html+=`<div style="font-size:13px;color:var(--text3);font-style:italic;padding:8px 0">Nessun feedback</div>`;
-    html+='</div></details>';
+    html+='</div></div></details>';
     mc.innerHTML=html;
   }catch(e){mc.innerHTML=`<div style="color:red;padding:20px">Errore: ${e.message}</div>`;}
+}
+// Filtra i pesi nel modal profilo cliente
+function filterPesiModal(clientId){
+  const q=(document.getElementById('pesi-'+clientId)?.value||'').toLowerCase();
+  const list=document.getElementById('pesi-list-'+clientId);
+  if(!list)return;
+  list.querySelectorAll('details').forEach(d=>{
+    const name=d.querySelector('summary span')?.textContent?.toLowerCase()||'';
+    d.style.display=(!q||name.includes(q))?'':'none';
+  });
 }
 
 // ══════════════════════════════════
