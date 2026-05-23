@@ -268,6 +268,7 @@ input,textarea,select{font-family:'DM Sans',sans-serif}
 .ex-builder{background:var(--warm);border:1.5px solid var(--border);border-radius:var(--r);padding:12px;margin-bottom:7px}
 .ex-builder-row{display:flex;gap:6px;flex-wrap:wrap;align-items:flex-end}
 .ex-builder-row .field{flex:1;min-width:70px;margin-bottom:0}
+.eb-drag-handle{color:var(--text3);font-size:16px;cursor:grab;padding:4px 2px;align-self:center;user-select:none;flex-shrink:0}
 .btn-add-ex{width:100%;background:transparent;border:1.5px dashed rgba(232,82,122,0.25);border-radius:var(--r);color:var(--rose);font-size:12px;padding:9px;transition:var(--tr);margin-top:5px}
 .btn-add-ex:hover{background:var(--rose-pale)}
 .btn-add-day{width:100%;background:transparent;border:1.5px dashed rgba(123,63,160,0.22);border-radius:var(--r2);color:var(--violet);font-size:13px;padding:13px;transition:var(--tr);margin-top:8px}
@@ -375,8 +376,15 @@ input,textarea,select{font-family:'DM Sans',sans-serif}
   .admin-chat-contacts{border-right:none!important;border-bottom:1px solid var(--border);max-height:200px;overflow-y:auto}
   .admin-chat-contacts.mob-hidden{display:none!important}
   #admin-chat-msgs{min-height:240px!important;max-height:340px}
-  /* Builder */
-  .ex-builder-row{flex-direction:column!important}
+  /* Builder – layout esplicito su mobile */
+  .ex-builder-row{flex-direction:row!important;flex-wrap:wrap!important;gap:5px!important;align-items:flex-end}
+  .eb-field-name{flex:0 0 100%!important;max-width:100%!important;min-width:0!important}
+  .eb-field-sets,.eb-field-reps,.eb-field-rec,.eb-field-rpe{flex:1 1 calc(24% - 4px)!important;max-width:calc(25% - 4px)!important;min-width:52px!important}
+  .eb-field-tecnica{flex:1 1 calc(58% - 4px)!important;max-width:calc(60% - 4px)!important}
+  .eb-field-tipogruppo{flex:1 1 calc(36% - 4px)!important;max-width:calc(38% - 4px)!important}
+  .eb-field-gruppo{flex:0 0 42px!important;max-width:42px!important;min-width:42px!important}
+  .eb-field-note{flex:0 0 100%!important;max-width:100%!important;min-width:0!important}
+  .eb-drag-handle{display:none}
   .meso-config .grid-2{grid-template-columns:1fr!important}
   .day-builder{padding:10px}
   /* Login/register */
@@ -388,7 +396,7 @@ input,textarea,select{font-family:'DM Sans',sans-serif}
   /* Day tabs */
   .day-tabs-wrap{overflow-x:auto}
   /* Builder inputs */
-  .eb-name,.eb-sets,.eb-reps,.eb-rec,.eb-rpe,.eb-tecnica,.eb-note{width:100%!important;min-width:0!important}
+  .eb-name,.eb-sets,.eb-reps,.eb-rec,.eb-rpe,.eb-tecnica,.eb-note{width:100%!important;min-width:0!important;max-width:100%!important}
   /* Piano macro edit */
   .macro-edit-field input{font-size:16px;width:100%}
   /* Macro ring cards: 2 per row */
@@ -2320,7 +2328,20 @@ async function showCiTab(tab,btn){
   ['form','q','history'].forEach(t=>{const p=document.getElementById('ci-panel-'+t);if(p)p.style.display=t===tab?'block':'none';});
   document.querySelectorAll('[id^="ci-tab-"]').forEach(b=>b.classList.remove('active'));
   if(btn)btn.classList.add('active');
-  if(tab==='q')renderCheckQ();
+  if(tab==='q'){
+    (async()=>{
+      let prev={};
+      if(user?.id){
+        try{
+          const {data}=await supa.from('check_questionari').select('risposte,created_at').eq('cliente_id',user.id).order('created_at',{ascending:false}).limit(2);
+          const now=new Date();
+          const last=data?.find(d=>{const m=new Date(d.created_at);return !(m.getMonth()===now.getMonth()&&m.getFullYear()===now.getFullYear());});
+          if(last?.risposte)prev=last.risposte;else if(data?.[0]?.risposte)prev=data[0].risposte;
+        }catch(e){console.warn('prev check:',e);}
+      }
+      renderCheckQ(prev);
+    })();
+  }
   if(tab==='history')renderCiHistory();
   if(tab==='form')renderCiQuickHistory();
 }
@@ -2424,7 +2445,7 @@ function renderQBlock(q,answers,prefix){
 // Q save helpers (auto-save on every interaction)
 function qSave(prefix,qid,val){
   if(prefix==='an'){anamnesiAnswers[qid]=val;ss('anamnesi',anamnesiAnswers);}
-  else{checkAnswers[qid]=val;ss('checkAnswers',checkAnswers);}
+  else{checkAnswers[qid]=val;ss('checkAnswers',checkAnswers);updateCiProgress();}
 }
 function qSaveRadio(label,prefix,qid,val){
   label.closest('.q-radio-group').querySelectorAll('.q-radio-opt').forEach(l=>l.classList.remove('selected'));
@@ -2459,10 +2480,30 @@ function renderAnamnesi(){
   if(!el)return;
   el.innerHTML=ANAMNESI_QUESTIONS.map(q=>renderQBlock(q,anamnesiAnswers,'an')).join('')+`<div style="margin-top:20px;padding:16px;background:linear-gradient(135deg,rgba(232,82,122,0.10),rgba(248,221,230,0.55));border:2px solid rgba(232,82,122,0.30);border-radius:12px;font-size:13px;line-height:1.7;color:var(--text)">❤️&nbsp;<strong>Ricordati:</strong> inviami le <strong>fotografie iniziali</strong> (fronte, retro e laterali) su <strong>WhatsApp</strong>, carica <strong>peso e misure</strong> nella sezione <em>Check-in mensile → Misure</em> e prenota la tua <strong>consulenza iniziale</strong> dall’apposita sezione <em>“Prenota chiamata”</em> del menu.</div>`;
 }
-function renderCheckQ(){
+function renderCheckQ(prevAnswers){
+  prevAnswers=prevAnswers||{};
   const el=document.getElementById('check-q-container');
   if(!el)return;
-  el.innerHTML=CHECK_QUESTIONS.map(q=>renderQBlock(q,checkAnswers,'ck')).join('')+`<div style="margin-top:20px;padding:16px;background:linear-gradient(135deg,rgba(232,82,122,0.10),rgba(248,221,230,0.55));border:2px solid rgba(232,82,122,0.30);border-radius:12px;font-size:13px;line-height:1.7;color:var(--text)">❤️&nbsp;<strong>Ricordati:</strong> inviami le <strong>fotografie</strong> (fronte, retro e laterali) su <strong>WhatsApp</strong> e carica <strong>peso e misure aggiornati</strong> nell’apposita sezione dell’app.</div>`;
+  const total=CHECK_QUESTIONS.filter(q=>q.type!=='file_note').length;
+  const filled=CHECK_QUESTIONS.filter(q=>q.type!=='file_note'&&checkAnswers[q.id]!==undefined&&checkAnswers[q.id]!=='').length;
+  const pct=total>0?Math.round(filled/total*100):0;
+  const progBar=`<div id="ci-prog-wrap" style="position:sticky;top:0;z-index:10;background:var(--bg);padding:10px 0 6px;margin-bottom:8px;border-bottom:1px solid var(--border)">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px">
+      <span style="font-size:12px;color:var(--text2);font-weight:500">📋 Questionario mensile</span>
+      <span style="font-size:12px;color:var(--rose);font-weight:700" id="ci-prog-label">${filled} di ${total} compilate</span>
+    </div>
+    <div style="background:var(--warmb);border-radius:20px;height:5px;overflow:hidden">
+      <div id="ci-prog-bar" style="height:100%;border-radius:20px;background:linear-gradient(90deg,var(--rose),var(--violet));transition:width 0.4s ease;width:${pct}%"></div>
+    </div>
+  </div>`;
+  el.innerHTML=progBar+CHECK_QUESTIONS.map(q=>renderQBlock(q,checkAnswers,'ck',prevAnswers)).join('')+`<div style="margin-top:20px;padding:16px;background:linear-gradient(135deg,rgba(232,82,122,0.10),rgba(248,221,230,0.55));border:2px solid rgba(232,82,122,0.30);border-radius:12px;font-size:13px;line-height:1.7;color:var(--text)">❤️&nbsp;<strong>Ricordati:</strong> inviami le <strong>fotografie</strong> (fronte, retro e laterali) su <strong>WhatsApp</strong> e carica <strong>peso e misure aggiornati</strong> nell'apposita sezione dell'app.</div>`;
+}
+function updateCiProgress(){
+  const total=CHECK_QUESTIONS.filter(q=>q.type!=='file_note').length;
+  const filled=CHECK_QUESTIONS.filter(q=>q.type!=='file_note'&&checkAnswers[q.id]!==undefined&&checkAnswers[q.id]!=='').length;
+  const pct=total>0?Math.round(filled/total*100):0;
+  const bar=document.getElementById('ci-prog-bar');if(bar)bar.style.width=pct+'%';
+  const lbl=document.getElementById('ci-prog-label');if(lbl)lbl.textContent=filled+' di '+total+' compilate';
 }
 function collectAnswers(prefix,questions){
   // Answers are auto-saved to state on every interaction, just return the state
@@ -2694,20 +2735,39 @@ async function addDay(){
   document.getElementById('days-container').appendChild(div);
 }
 async function addExBuilder(btn){
-  const c=btn.closest('.day-builder').querySelector('.db-exs');const div=document.createElement('div');div.className='ex-builder';
+  const c=btn.closest('.day-builder').querySelector('.db-exs');const div=document.createElement('div');div.className='ex-builder';div.draggable=true;
   div.innerHTML=`<div class="ex-builder-row">
-    <div class="field" style="flex:2;min-width:120px"><label>Esercizio</label><div style="position:relative"><input type="text" class="eb-name" placeholder="Nome esercizio" list="ex-datalist" oninput="checkExVideo(this)"><span class="eb-vid-dot" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);font-size:13px;cursor:default;pointer-events:none" title="Nessun video">⚪</span></div></div>
-    <div class="field" style="max-width:55px"><label>Serie</label><input type="number" class="eb-sets" value="3" min="1" style="background:var(--warm);border:1.5px solid var(--border);border-radius:var(--r);padding:7px 6px;color:var(--text);font-size:13px;outline:none;text-align:center"></div>
-    <div class="field" style="max-width:70px"><label>Rip.</label><input type="text" class="eb-reps" value="10-12" style="background:var(--warm);border:1.5px solid var(--border);border-radius:var(--r);padding:7px 6px;color:var(--text);font-size:13px;outline:none"></div>
-    <div class="field" style="max-width:62px"><label>Recup.</label><input type="text" class="eb-rec" value="90s" style="background:var(--warm);border:1.5px solid var(--border);border-radius:var(--r);padding:7px 6px;color:var(--text);font-size:13px;outline:none"></div>
-    <div class="field" style="max-width:55px"><label>RPE</label><input type="number" class="eb-rpe" min="1" max="10" placeholder="—" style="background:var(--warm);border:1.5px solid var(--border);border-radius:var(--r);padding:7px 6px;color:var(--text);font-size:13px;outline:none;text-align:center"></div>
-    <div class="field" style="max-width:140px"><label>Tecnica</label><input type="text" class="eb-tecnica" placeholder="—" list="tecnica-list" style="background:var(--warm);border:1.5px solid var(--border);border-radius:var(--r);padding:7px 6px;color:var(--text);font-size:13px;outline:none"></div>
-    <div class="field" style="max-width:90px"><label>Gruppo</label><select class="eb-tipo-gruppo" style="background:var(--warm);border:1.5px solid var(--border);border-radius:var(--r);padding:7px 5px;color:var(--text);font-size:12px;outline:none"><option value="">—</option><option value="superset">Superset</option><option value="triset">Triset</option><option value="circuit">Circuito</option></select></div>
-    <div class="field" style="max-width:44px"><label>Lett.</label><input type="text" class="eb-gruppo" maxlength="2" placeholder="A" style="background:var(--warm);border:1.5px solid var(--border);border-radius:var(--r);padding:7px 6px;color:var(--text);font-size:13px;outline:none;text-align:center;text-transform:uppercase"></div>
-    <div class="field" style="flex:2;min-width:100px"><label>Note</label><input type="text" class="eb-note" placeholder="Note tecniche..." style="background:var(--warm);border:1.5px solid var(--border);border-radius:var(--r);padding:7px 6px;color:var(--text);font-size:13px;outline:none"></div>
+    <div class="eb-drag-handle" title="Trascina per riordinare">⠿</div>
+    <div class="field eb-field-name" style="flex:2;min-width:120px"><label>Esercizio</label><div style="position:relative"><input type="text" class="eb-name" placeholder="Nome esercizio" list="ex-datalist" oninput="checkExVideo(this)"><span class="eb-vid-dot" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);font-size:13px;cursor:default;pointer-events:none" title="Nessun video">⚪</span></div></div>
+    <div class="field eb-field-sets" style="max-width:55px"><label>Serie</label><input type="number" class="eb-sets" value="3" min="1" style="background:var(--warm);border:1.5px solid var(--border);border-radius:var(--r);padding:7px 6px;color:var(--text);font-size:13px;outline:none;text-align:center"></div>
+    <div class="field eb-field-reps" style="max-width:70px"><label>Rip.</label><input type="text" class="eb-reps" value="10-12" style="background:var(--warm);border:1.5px solid var(--border);border-radius:var(--r);padding:7px 6px;color:var(--text);font-size:13px;outline:none"></div>
+    <div class="field eb-field-rec" style="max-width:62px"><label>Recup.</label><input type="text" class="eb-rec" value="90s" style="background:var(--warm);border:1.5px solid var(--border);border-radius:var(--r);padding:7px 6px;color:var(--text);font-size:13px;outline:none"></div>
+    <div class="field eb-field-rpe" style="max-width:55px"><label>RPE</label><input type="number" class="eb-rpe" min="1" max="10" placeholder="—" style="background:var(--warm);border:1.5px solid var(--border);border-radius:var(--r);padding:7px 6px;color:var(--text);font-size:13px;outline:none;text-align:center"></div>
+    <div class="field eb-field-tecnica" style="max-width:140px"><label>Tecnica</label><input type="text" class="eb-tecnica" placeholder="—" list="tecnica-list" style="background:var(--warm);border:1.5px solid var(--border);border-radius:var(--r);padding:7px 6px;color:var(--text);font-size:13px;outline:none"></div>
+    <div class="field eb-field-tipogruppo" style="max-width:90px"><label>Gruppo</label><select class="eb-tipo-gruppo" style="background:var(--warm);border:1.5px solid var(--border);border-radius:var(--r);padding:7px 5px;color:var(--text);font-size:12px;outline:none"><option value="">—</option><option value="superset">Superset</option><option value="triset">Triset</option><option value="circuit">Circuito</option></select></div>
+    <div class="field eb-field-gruppo" style="max-width:44px"><label>Lett.</label><input type="text" class="eb-gruppo" maxlength="2" placeholder="A" style="background:var(--warm);border:1.5px solid var(--border);border-radius:var(--r);padding:7px 6px;color:var(--text);font-size:13px;outline:none;text-align:center;text-transform:uppercase"></div>
+    <div class="field eb-field-note" style="flex:2;min-width:100px"><label>Note</label><input type="text" class="eb-note" placeholder="Note tecniche..." style="background:var(--warm);border:1.5px solid var(--border);border-radius:var(--r);padding:7px 6px;color:var(--text);font-size:13px;outline:none"></div>
     <button onclick="this.closest('.ex-builder').remove()" style="background:transparent;border:none;color:var(--text3);font-size:16px;cursor:pointer;align-self:flex-end;margin-bottom:12px;padding:4px">×</button>
   </div>`;
-  c.appendChild(div);updateDatalist();
+  c.appendChild(div);updateDatalist();initBuilderDrag(c);
+}
+function initBuilderDrag(container){
+  if(container._dragInit)return;
+  container._dragInit=true;
+  let dragged=null;
+  container.addEventListener('dragstart',e=>{
+    const eb=e.target.closest('.ex-builder');if(!eb)return;
+    dragged=eb;setTimeout(()=>{if(dragged)dragged.style.opacity='0.4';},0);
+  });
+  container.addEventListener('dragend',()=>{if(dragged){dragged.style.opacity='1';dragged=null;}});
+  container.addEventListener('dragover',e=>{
+    e.preventDefault();
+    const target=e.target.closest('.ex-builder');
+    if(!target||!dragged||target===dragged)return;
+    const rect=target.getBoundingClientRect();
+    if(e.clientY<rect.top+rect.height/2)container.insertBefore(dragged,target);
+    else container.insertBefore(dragged,target.nextSibling);
+  });
 }
 function checkExVideo(input){
   const dot=input.parentElement.querySelector('.eb-vid-dot');if(!dot)return;
@@ -2715,7 +2775,7 @@ function checkExVideo(input){
   if(ex?.video){dot.textContent='🎥';dot.title='Video YouTube disponibile';}
   else{dot.textContent='⚪';dot.title='Nessun video';}}
 
-async function updateDatalist(){let dl=document.getElementById('ex-datalist');if(!dl){dl=document.createElement('datalist');dl.id='ex-datalist';document.body.appendChild(dl);}dl.innerHTML=exerciseLibrary.map(e=>`<option value="${e.name}">`).join('');}
+async function updateDatalist(){let dl=document.getElementById('ex-datalist');if(!dl){dl=document.createElement('datalist');dl.id='ex-datalist';document.body.appendChild(dl);}dl.innerHTML=exerciseLibrary.map(e=>`<option value="${e.name}">${e.cat?e.cat+' — ':' '}${e.name}</option>`).join('');}
 async function saveScheda(){
   const nome=document.getElementById('s-nome').value.trim();if(!nome){toast('❌ Inserisci un nome');return;}
   const clienteSelect=document.getElementById('s-cliente');
@@ -3526,7 +3586,8 @@ async function renderAdminFeedback(skipRebuild){
       </summary>
       <div style="padding:6px 12px;background:var(--bg2)">
         ${items.map(f=>{
-          const date=new Date(f.created_at).toLocaleDateString('it-IT',{day:'numeric',month:'short'});
+          const _fd=new Date(f.created_at);const _now=new Date();
+          const date=_fd.toLocaleDateString('it-IT',{weekday:'short',day:'numeric',month:'short',...(_fd.getFullYear()!==_now.getFullYear()?{year:'numeric'}:{})});
           return `<div style="font-size:12px;padding:5px 0;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;gap:8px">
             <span>${f.emoji||''} ${f.testo?'"'+ f.testo+'"':'<em style="color:var(--text3)">Solo emoji</em>'}</span>
             <span style="color:var(--text3);white-space:nowrap">${date}</span>
