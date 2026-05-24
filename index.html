@@ -809,7 +809,7 @@ input,textarea,select{font-family:'DM Sans',sans-serif}
           <div class="stat-card"><div class="stat-icon">💬</div><div class="stat-label">Clienti registrate</div><div class="stat-value" id="adm-msgs">0</div></div>
           <div class="stat-card"><div class="stat-icon">📋</div><div class="stat-label">Schede create</div><div class="stat-value" id="adm-schede-n">0</div></div>
         </div>
-        <div class="card"><div class="card-title" style="display:flex;justify-content:space-between;align-items:center">Le tue clienti <button class="btn-primary" style="font-size:12px;padding:7px 14px" onclick="openInviteModal()">✉️ Invita cliente</button></div>
+        <div class="card"><div class="card-title" style="display:flex;justify-content:space-between;align-items:center">Le tue clienti <div style="display:flex;gap:6px;align-items:center"><button class="btn-ghost" style="font-size:12px;padding:6px 10px" onclick="navigate('admin-dashboard')" title="Ricarica lista">🔄</button><button class="btn-primary" style="font-size:12px;padding:7px 14px" onclick="openInviteModal()">✉️ Invita cliente</button></div></div>
           <table class="tbl"><thead><tr><th>Nome</th><th>Stato</th><th>Ultimo all.</th><th>Check-in</th><th>Aderenza</th><th>Azioni</th></tr></thead>
           <tbody id="admin-tbody"></tbody></table>
         </div>
@@ -1523,7 +1523,8 @@ async function loadUserData(){
       }
     } else {
       // Admin: load all clients
-      const {data:allProfiles}=await supa.from('profiles').select('*').eq('role','cliente');
+      const {data:allProfiles,error:profErr}=await supa.from('profiles').select('*').eq('role','cliente');
+      if(profErr)console.error('profiles load error:',profErr);
       if(allProfiles?.length){
         // Fetch ultima sessione e ultimo check-in per ogni cliente — query separate ed efficienti
         const clientIds=allProfiles.map(p=>p.id);
@@ -2874,46 +2875,42 @@ function initBuilderDrag(container){
 // Filtra le opzioni di un <select> in base a un <input> di ricerca
 // withAll: se true mantiene "Tutte le clienti" come prima opzione
 // Select cliente — ricostruisce sempre da clientiList (fonte unica affidabile)
+// Configurazione select clienti: placeholder e onchange handler
 const _CLIENT_SELECTS_CFG={
-  's-cliente':     '— Template (non assegnata) —',
-  'ap-cliente':    '— Seleziona cliente —',
-  'rem-cliente':   '— Seleziona cliente —',
-  'ci-cliente-filter': 'Tutte le clienti'
+  's-cliente':        {ph:'— Template (non assegnata) —', style:'', onchange:''},
+  'ap-cliente':       {ph:'— Seleziona cliente —',        style:'', onchange:'renderAdminPiano()'},
+  'rem-cliente':      {ph:'— Seleziona cliente —',        style:'', onchange:''},
+  'ci-cliente-filter':{ph:'Tutte le clienti',             style:'flex:1;min-width:160px;background:var(--card);border:1.5px solid var(--border);border-radius:var(--r);padding:9px 14px;color:var(--text);font-size:13px;outline:none', onchange:'renderAdminCi()'}
 };
-function filterDropdown(selectId, searchId, triggerFn){
+// filterDropdown: rimpiazza l'INTERO elemento <select> (pattern identico a filterQClients)
+// Questo è l'unico approccio affidabile su iOS Safari, che ignora sel.innerHTML=...
+function filterDropdown(selectId, searchId){
   const sel=document.getElementById(selectId);
-  if(!sel)return;
+  if(!sel||!sel.parentNode)return;
+  const cfg=_CLIENT_SELECTS_CFG[selectId];
+  if(!cfg)return;
   const q=(document.getElementById(searchId)?.value||'').toLowerCase();
   const curVal=sel.value;
-  if(_CLIENT_SELECTS_CFG[selectId]!==undefined){
-    const placeholder=_CLIENT_SELECTS_CFG[selectId];
-    const filtered=q ? clientiList.filter(cl=>cl.name.toLowerCase().includes(q)) : clientiList;
-    sel.innerHTML=`<option value="">${placeholder}</option>`+
-      filtered.map(cl=>`<option value="${cl.id}">${cl.name}</option>`).join('');
-    // Con query attiva: se il valore precedente è tra i risultati, mantienilo;
-    // altrimenti auto-seleziona il primo cliente trovato (non il placeholder)
-    if(q && filtered.length){
-      const match=filtered.find(cl=>cl.id===curVal);
-      sel.value=match?curVal:filtered[0].id;
-    } else {
-      // Nessuna query: ripristina selezione precedente o placeholder
-      const still=Array.from(sel.options).find(o=>o.value===curVal);
-      sel.value=still?curVal:'';
-    }
-  } else {
-    if(!sel._cachedOpts){
-      sel._cachedOpts=Array.from(sel.options).map(o=>({v:o.value,t:o.textContent}));
-    }
-    sel.innerHTML=sel._cachedOpts
-      .filter(o=>o.v===''||!q||o.t.toLowerCase().includes(q))
-      .map(o=>`<option value="${o.v}">${o.t}</option>`)
-      .join('');
-    const still=Array.from(sel.options).find(o=>o.value===curVal);
-    sel.value=still?curVal:(sel.options[0]?.value||'');
+  const filtered=q ? clientiList.filter(cl=>cl.name.toLowerCase().includes(q)) : clientiList;
+  // Valore da selezionare dopo il rimpiazzo
+  let nextVal='';
+  if(q && filtered.length){
+    // Se il valore corrente è ancora nei risultati, mantienilo; altrimenti primo risultato
+    nextVal=filtered.find(cl=>cl.id===curVal)?curVal:filtered[0].id;
+  } else if(!q && clientiList.find(cl=>cl.id===curVal)){
+    nextVal=curVal; // ripristina selezione precedente
   }
-  // Callback — per ci-cliente-filter trigga sempre renderAdminCi per aggiornare la lista
+  // Costruisce il nuovo <select> identico al vecchio ma con opzioni filtrate
+  const oc=cfg.onchange?` onchange="${cfg.onchange}"`:'';
+  const st=cfg.style?` style="${cfg.style}"`:'';
+  const opts=`<option value="">${cfg.ph}</option>`+
+    filtered.map(cl=>`<option value="${cl.id}"${cl.id===nextVal?' selected':''}>${cl.name}</option>`).join('');
+  // Rimpiazza l'elemento nel DOM — stesso pattern di filterQClients
+  const wrapper=document.createElement('div');
+  wrapper.innerHTML=`<select id="${selectId}"${oc}${st}>${opts}</select>`;
+  sel.parentNode.replaceChild(wrapper.firstChild, sel);
+  // Callback post-rimpiazzo
   if(selectId==='ci-cliente-filter') renderAdminCi();
-  else if(typeof triggerFn==='function') triggerFn();
 }
 
 // Filtra la lista contatti nella chat coach
