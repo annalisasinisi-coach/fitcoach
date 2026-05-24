@@ -1468,7 +1468,7 @@ async function loadUserData(){
       if(msgs?.length) chatMsgs = msgs.map(m=>({from:m.mittente_id===user.id?'me':'coach',text:m.testo||'',time:new Date(m.created_at).toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'}),type:m.tipo||'text',fname:m.file_nome}));
       // Load piano alimentare
       const pianoData = await dbGet('piani_alimentari','cliente_id',user.id);
-      if(pianoData[0]){const p=pianoData[0];macros={prot:p.prot_g||140,carb:p.carb_g||180,fat:p.fat_g||55,kcal:p.kcal||1740};if(p.pasti?.length)adminMeals=p.pasti;}
+      if(pianoData[0]){const p=pianoData[0];macros={prot:p.prot_g||140,carb:p.carb_g||180,fat:p.fat_g||55,kcal:p.kcal||1740};if(p.pasti?.length)adminMeals=p.pasti.filter(x=>x._type!=='macroset');}
       // Load anamnesi
       const anData = await dbGet('anamnesi','cliente_id',user.id);
       if(anData[0]) anamnesiAnswers = anData[0].risposte||{};
@@ -1508,7 +1508,7 @@ async function loadUserData(){
       if(pianoRows?.length){
         const p=pianoRows[0];
         macros={prot:p.prot_g||0,carb:p.carb_g||0,fat:p.fat_g||0,kcal:p.kcal||0};
-        if(p.pasti?.length) adminMeals=p.pasti;
+        if(p.pasti?.length) adminMeals=p.pasti.filter(x=>x._type!=='macroset');
       }
       // Load exercise library (needed for video URLs in workout view)
       const {data:libDataC}=await supa.from('esercizi').select('*');
@@ -2873,29 +2873,41 @@ function initBuilderDrag(container){
 // ── SEARCH HELPERS ─────────────────────────────────────────
 // Filtra le opzioni di un <select> in base a un <input> di ricerca
 // withAll: se true mantiene "Tutte le clienti" come prima opzione
-// _selectAllOptions: cache delle opzioni originali per ogni select
-const _selectAllOptions={};
+// Select cliente — ricostruisce sempre da clientiList (fonte unica affidabile)
+const _CLIENT_SELECTS_CFG={
+  's-cliente':     '— Template (non assegnata) —',
+  'ap-cliente':    '— Seleziona cliente —',
+  'rem-cliente':   '— Seleziona cliente —',
+  'ci-cliente-filter': 'Tutte le clienti'
+};
 function filterDropdown(selectId, searchId, triggerFn){
   const sel=document.getElementById(selectId);
   if(!sel)return;
-  // Salva le opzioni originali la prima volta (nome + value)
-  if(!_selectAllOptions[selectId]){
-    _selectAllOptions[selectId]=Array.from(sel.options).map(o=>({v:o.value,t:o.textContent}));
-  }
   const q=(document.getElementById(searchId)?.value||'').toLowerCase();
-  const all=_selectAllOptions[selectId];
   const curVal=sel.value;
-  // Ricostruisce le opzioni filtrate (cross-browser: display:none non funziona su <option> in Safari)
-  sel.innerHTML=all
-    .filter(o=>o.v===''||!q||o.t.toLowerCase().includes(q))
-    .map(o=>`<option value="${o.v}">${o.t}</option>`)
-    .join('');
-  // Ripristina selezione precedente se ancora presente, altrimenti prima disponibile
+  if(_CLIENT_SELECTS_CFG[selectId]!==undefined){
+    // Ricostruisce da clientiList — la cache non è affidabile perché il select
+    // potrebbe essere ancora vuoto quando filterDropdown viene chiamata la prima volta
+    const placeholder=_CLIENT_SELECTS_CFG[selectId];
+    const filtered=q ? clientiList.filter(cl=>cl.name.toLowerCase().includes(q)) : clientiList;
+    sel.innerHTML=`<option value="">${placeholder}</option>`+
+      filtered.map(cl=>`<option value="${cl.id}">${cl.name}</option>`).join('');
+  } else {
+    // Per altri select: usa le opzioni esistenti nel DOM
+    if(!sel._cachedOpts){
+      sel._cachedOpts=Array.from(sel.options).map(o=>({v:o.value,t:o.textContent}));
+    }
+    sel.innerHTML=sel._cachedOpts
+      .filter(o=>o.v===''||!q||o.t.toLowerCase().includes(q))
+      .map(o=>`<option value="${o.v}">${o.t}</option>`)
+      .join('');
+  }
+  // Ripristina selezione precedente se disponibile
   const still=Array.from(sel.options).find(o=>o.value===curVal);
   sel.value=still?curVal:(sel.options[0]?.value||'');
-  // Callback opzionale (es. renderAdminCi per check-in)
-  if(typeof triggerFn==='function')triggerFn();
-  else if(selectId==='ci-cliente-filter')renderAdminCi();
+  // Callback
+  if(selectId==='ci-cliente-filter') renderAdminCi();
+  else if(typeof triggerFn==='function') triggerFn();
 }
 
 // Filtra la lista contatti nella chat coach
@@ -3487,7 +3499,7 @@ async function renderAdminPiano(){
       if(piano.carb_g)document.getElementById('ap-carb').value=piano.carb_g;
       if(piano.fat_g)document.getElementById('ap-fat').value=piano.fat_g;
       if(piano.kcal)document.getElementById('ap-kcal').value=piano.kcal;
-      adminMeals=piano.pasti||[];
+      adminMeals=(piano.pasti||[]).filter(x=>x._type!=='macroset');
     } else {
       adminMeals=[];
     }
