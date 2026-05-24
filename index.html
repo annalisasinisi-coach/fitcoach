@@ -888,15 +888,21 @@ input,textarea,select{font-family:'DM Sans',sans-serif}
             <div class="card" style="margin-bottom:14px">
               <div class="card-title">⚙️ Configura macros</div>
               <div class="field"><label>Seleziona cliente</label><select id="ap-cliente" onchange="renderAdminPiano()"><option value="">— Seleziona cliente —</option></select></div>
-              <div class="macro-edit-form">
-                <div class="macro-edit-field"><label style="color:var(--rose)">Proteine (g)</label><input type="number" id="ap-prot" value="140" style="border-color:rgba(232,82,122,0.3)" oninput="calcKcal()"></div>
-                <div class="macro-edit-field"><label style="color:#C07040">Carboidrati (g)</label><input type="number" id="ap-carb" value="180" style="border-color:rgba(245,168,130,0.4)" oninput="calcKcal()"></div>
-                <div class="macro-edit-field"><label style="color:var(--violet)">Grassi (g)</label><input type="number" id="ap-fat" value="55" style="border-color:rgba(123,63,160,0.3)" oninput="calcKcal()"></div>
-                <div class="macro-edit-field"><label>Kcal</label><input type="number" id="ap-kcal" value="1740" readonly style="background:var(--warmb);color:var(--text2)"></div>
-              </div>
-              <div style="display:flex;gap:8px">
-                <button class="btn-sm" onclick="calcKcal()">Calcola kcal auto</button>
-                <button class="btn-primary" onclick="saveMacros()">Salva macros</button>
+              <!-- Lista macro-sets esistenti -->
+              <div id="ap-macrosets-list" style="margin-bottom:10px"></div>
+              <!-- Form aggiunta/modifica set -->
+              <div id="ap-macroset-form" style="border:1.5px solid var(--border);border-radius:var(--r2);padding:12px;background:var(--warm);margin-bottom:10px">
+                <div class="field"><label>Nome set macros</label><input type="text" id="ap-macroset-nome" placeholder="es. Giornata ON, Giornata OFF, Giornata normale..." style="font-size:13px"></div>
+                <div class="macro-edit-form">
+                  <div class="macro-edit-field"><label style="color:var(--rose)">Proteine (g)</label><input type="number" id="ap-prot" value="140" style="border-color:rgba(232,82,122,0.3)" oninput="calcKcal()"></div>
+                  <div class="macro-edit-field"><label style="color:#C07040">Carboidrati (g)</label><input type="number" id="ap-carb" value="180" style="border-color:rgba(245,168,130,0.4)" oninput="calcKcal()"></div>
+                  <div class="macro-edit-field"><label style="color:var(--violet)">Grassi (g)</label><input type="number" id="ap-fat" value="55" style="border-color:rgba(123,63,160,0.3)" oninput="calcKcal()"></div>
+                  <div class="macro-edit-field"><label>Kcal</label><input type="number" id="ap-kcal" value="1740" readonly style="background:var(--warmb);color:var(--text2)"></div>
+                </div>
+                <div style="display:flex;gap:8px;flex-wrap:wrap">
+                  <button class="btn-sm" onclick="calcKcal()">Calcola kcal auto</button>
+                  <button class="btn-primary" onclick="saveMacros()">💾 Aggiungi set</button>
+                </div>
               </div>
             </div>
             <div class="card">
@@ -2616,7 +2622,27 @@ async function exportToPdf(title,questions,answers){
 // PIANO ALIMENTARE
 // ══════════════════════════════════
 async function renderPiano(){
-  document.getElementById('macro-overview').innerHTML=`<div class="macro-ring-card"><div class="macro-circle prot">${macros.prot}g</div><div><div class="macro-val">${macros.prot}g</div><div class="macro-label">Proteine</div></div></div><div class="macro-ring-card"><div class="macro-circle carb">${macros.carb}g</div><div><div class="macro-val">${macros.carb}g</div><div class="macro-label">Carboidrati</div></div></div><div class="macro-ring-card"><div class="macro-circle fat">${macros.fat}g</div><div><div class="macro-val">${macros.fat}g</div><div class="macro-label">Grassi</div></div></div><div class="macro-ring-card"><div class="macro-circle kcal">${macros.kcal}</div><div><div class="macro-val">${macros.kcal}</div><div class="macro-label">Kcal/giorno</div></div></div>`;
+  // Carica piano attuale per mostrare tutti i macrosets
+  const moEl=document.getElementById('macro-overview');
+  if(moEl){
+    // Controlla se ci sono macrosets nel piano
+    const pianoData=await supa.from('piani_alimentari').select('pasti').eq('cliente_id',user.id).maybeSingle().then(r=>r.data);
+    const macrosets=(pianoData?.pasti||[]).filter(p=>p._type==='macroset');
+    if(macrosets.length){
+      moEl.innerHTML=macrosets.map(s=>`<div style="background:var(--card);border:1.5px solid var(--border);border-radius:var(--r2);padding:12px 14px;margin-bottom:8px;width:100%">
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--violet);margin-bottom:8px">${s.nome}</div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <div class="macro-ring-card"><div class="macro-circle prot">${s.prot}g</div><div><div class="macro-val">${s.prot}g</div><div class="macro-label">Proteine</div></div></div>
+          <div class="macro-ring-card"><div class="macro-circle carb">${s.carb}g</div><div><div class="macro-val">${s.carb}g</div><div class="macro-label">Carboidrati</div></div></div>
+          <div class="macro-ring-card"><div class="macro-circle fat">${s.fat}g</div><div><div class="macro-val">${s.fat}g</div><div class="macro-label">Grassi</div></div></div>
+          <div class="macro-ring-card"><div class="macro-circle kcal">${s.kcal}</div><div><div class="macro-val">${s.kcal}</div><div class="macro-label">Kcal/giorno</div></div></div>
+        </div>
+      </div>`).join('');
+    } else {
+      // Fallback: vecchio formato singolo
+      moEl.innerHTML=`<div class="macro-ring-card"><div class="macro-circle prot">${macros.prot}g</div><div><div class="macro-val">${macros.prot}g</div><div class="macro-label">Proteine</div></div></div><div class="macro-ring-card"><div class="macro-circle carb">${macros.carb}g</div><div><div class="macro-val">${macros.carb}g</div><div class="macro-label">Carboidrati</div></div></div><div class="macro-ring-card"><div class="macro-circle fat">${macros.fat}g</div><div><div class="macro-val">${macros.fat}g</div><div class="macro-label">Grassi</div></div></div><div class="macro-ring-card"><div class="macro-circle kcal">${macros.kcal}</div><div><div class="macro-val">${macros.kcal}</div><div class="macro-label">Kcal/giorno</div></div></div>`;
+    }
+  }
 
   if(!adminMeals.length){
     document.getElementById('meals-container').innerHTML='';
@@ -2750,8 +2776,7 @@ async function saveProfilo(){
 // ADMIN
 // ══════════════════════════════════
 function populateClientDropdowns(){
-  // Invalida la cache delle opzioni filtrate (verranno rigenerate al prossimo filterDropdown)
-  ['s-cliente','ap-cliente','rem-cliente','ci-cliente-filter'].forEach(id=>delete _selectAllOptions[id]);
+  // Popola tutti i select cliente incluso ci-cliente-filter
   const selects=['s-cliente','ap-cliente','rem-cliente'];
   selects.forEach(id=>{
     const el=document.getElementById(id);
@@ -2765,7 +2790,11 @@ function populateClientDropdowns(){
       el.appendChild(opt);
     });
     if(cur)el.value=cur;
+    // Salva subito la cache per filterDropdown (così funziona anche su Safari)
+    _selectAllOptions[id]=Array.from(el.options).map(o=>({v:o.value,t:o.textContent}));
   });
+  // ci-cliente-filter è popolato da renderAdminCi — invalida e basta
+  delete _selectAllOptions['ci-cliente-filter'];
 }
 async function renderAdminDash(){
   const list = clientiList.length ? clientiList : [];
@@ -3363,21 +3392,64 @@ async function saveNewExercise(){
 async function calcKcal(){const p=parseInt(document.getElementById('ap-prot').value)||0,c=parseInt(document.getElementById('ap-carb').value)||0,f=parseInt(document.getElementById('ap-fat').value)||0;document.getElementById('ap-kcal').value=p*4+c*4+f*9;}
 function calcMealKcal(){const p=parseInt(document.getElementById('ap-meal-p').value)||0,c=parseInt(document.getElementById('ap-meal-c').value)||0,f=parseInt(document.getElementById('ap-meal-f').value)||0;document.getElementById('ap-meal-k').value=p*4+c*4+f*9;}
 async function saveMacros(){
-  macros={prot:parseInt(document.getElementById('ap-prot').value)||0,carb:parseInt(document.getElementById('ap-carb').value)||0,fat:parseInt(document.getElementById('ap-fat').value)||0,kcal:parseInt(document.getElementById('ap-kcal').value)||0};
-  ss('macros',macros);
   const cId=document.getElementById('ap-cliente').value;
-  if(cId&&user?.id){
-    const now=new Date().toISOString();
-    const {data:existing}=await supa.from('piani_alimentari').select('id').eq('cliente_id',cId).maybeSingle();
-    let err;
-    if(existing){
-      ({error:err}=await supa.from('piani_alimentari').update({coach_id:user.id,prot_g:macros.prot,carb_g:macros.carb,fat_g:macros.fat,kcal:macros.kcal,updated_at:now}).eq('cliente_id',cId));
-    } else {
-      ({error:err}=await supa.from('piani_alimentari').insert({cliente_id:cId,coach_id:user.id,prot_g:macros.prot,carb_g:macros.carb,fat_g:macros.fat,kcal:macros.kcal,updated_at:now}));
-    }
-    if(err){toast('❌ Errore salvataggio macros: '+err.message);console.error(err);return;}
+  if(!cId){toast('❌ Seleziona prima la cliente');return;}
+  const nome=(document.getElementById('ap-macroset-nome').value.trim())||'Set macros';
+  const prot=parseInt(document.getElementById('ap-prot').value)||0;
+  const carb=parseInt(document.getElementById('ap-carb').value)||0;
+  const fat=parseInt(document.getElementById('ap-fat').value)||0;
+  const kcal=parseInt(document.getElementById('ap-kcal').value)||0;
+  const newSet={_type:'macroset',nome,prot,carb,fat,kcal};
+  // Carica piano attuale
+  const {data:existing}=await supa.from('piani_alimentari').select('id,pasti').eq('cliente_id',cId).maybeSingle();
+  // Rimuovi eventuali vecchi macroset con lo stesso nome (upsert per nome)
+  const oldPasti=(existing?.pasti||[]).filter(p=>!(p._type==='macroset'&&p.nome===nome));
+  const updatedPasti=[...oldPasti,newSet];
+  let err;
+  if(existing){
+    ({error:err}=await supa.from('piani_alimentari').update({pasti:updatedPasti,updated_at:new Date().toISOString()}).eq('cliente_id',cId));
+  } else {
+    ({error:err}=await supa.from('piani_alimentari').insert({cliente_id:cId,coach_id:user.id,pasti:updatedPasti}));
   }
-  toast(`✅ Macros aggiornati!`);}
+  if(err){toast('❌ Errore: '+err.message);return;}
+  // Aggiorna preview
+  macros={prot,carb,fat,kcal};ss('macros',macros);
+  document.getElementById('ap-macroset-nome').value='';
+  renderAdminMacrosets(cId,updatedPasti);
+  toast(`✅ Set "${nome}" salvato!`);
+}
+async function delMacroset(cId,nome){
+  if(!confirm(`Eliminare il set macros "${nome}"?`))return;
+  const {data:existing}=await supa.from('piani_alimentari').select('id,pasti').eq('cliente_id',cId).maybeSingle();
+  if(!existing)return;
+  const updatedPasti=(existing.pasti||[]).filter(p=>!(p._type==='macroset'&&p.nome===nome));
+  const {error:err}=await supa.from('piani_alimentari').update({pasti:updatedPasti,updated_at:new Date().toISOString()}).eq('cliente_id',cId);
+  if(err){toast('❌ Errore: '+err.message);return;}
+  renderAdminMacrosets(cId,updatedPasti);
+  toast(`✅ Set "${nome}" eliminato`);
+}
+function renderAdminMacrosets(cId,pasti){
+  const el=document.getElementById('ap-macrosets-list');if(!el)return;
+  const sets=(pasti||[]).filter(p=>p._type==='macroset');
+  if(!sets.length){el.innerHTML='<div style="font-size:12px;color:var(--text3);margin-bottom:8px">Nessun set macros configurato. Aggiungine uno sotto.</div>';return;}
+  el.innerHTML=sets.map(s=>`<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:var(--warm);border:1px solid var(--border);border-radius:var(--r2);margin-bottom:6px;gap:8px">
+    <div>
+      <div style="font-size:13px;font-weight:700">${s.nome}</div>
+      <div style="font-size:11px;color:var(--text3)">P:${s.prot}g · C:${s.carb}g · G:${s.fat}g · ${s.kcal} kcal</div>
+    </div>
+    <div style="display:flex;gap:5px">
+      <button class="btn-sm" onclick="loadMacrosetInForm('${s.nome.replace(/'/g,"\\'")}',${s.prot},${s.carb},${s.fat},${s.kcal})" title="Modifica">✏️</button>
+      <button class="btn-danger" style="font-size:11px;padding:4px 8px" onclick="delMacroset('${cId}','${s.nome.replace(/'/g,"\\'")}')">🗑</button>
+    </div>
+  </div>`).join('');
+}
+function loadMacrosetInForm(nome,prot,carb,fat,kcal){
+  document.getElementById('ap-macroset-nome').value=nome;
+  document.getElementById('ap-prot').value=prot;
+  document.getElementById('ap-carb').value=carb;
+  document.getElementById('ap-fat').value=fat;
+  document.getElementById('ap-kcal').value=kcal;
+}
 async function addMealAdmin(){
   const cId=document.getElementById('ap-cliente').value;
   if(!cId){toast('❌ Seleziona prima la cliente nel blocco macros');return;}
@@ -3408,7 +3480,10 @@ async function renderAdminPiano(){
   if(cId){
     const {data:piano}=await supa.from('piani_alimentari').select('prot_g,carb_g,fat_g,kcal,pasti').eq('cliente_id',cId).maybeSingle();
     if(piano){
-      if(piano.prot_g)document.getElementById('ap-prot').value=piano.prot_g;
+      renderAdminMacrosets(cId,piano.pasti||[]);
+      const firstSet=(piano.pasti||[]).find(p=>p._type==='macroset');
+      if(firstSet){document.getElementById('ap-prot').value=firstSet.prot;document.getElementById('ap-carb').value=firstSet.carb;document.getElementById('ap-fat').value=firstSet.fat;document.getElementById('ap-kcal').value=firstSet.kcal;}
+      else if(piano.prot_g)document.getElementById('ap-prot').value=piano.prot_g;
       if(piano.carb_g)document.getElementById('ap-carb').value=piano.carb_g;
       if(piano.fat_g)document.getElementById('ap-fat').value=piano.fat_g;
       if(piano.kcal)document.getElementById('ap-kcal').value=piano.kcal;
@@ -3518,11 +3593,14 @@ async function renderAdminCi(){
   const filterEl=document.getElementById('ci-cliente-filter');
   if(filterEl&&clientiList.length&&filterEl.options.length<=1){
     clientiList.forEach(c=>{const o=document.createElement('option');o.value=c.id;o.textContent=c.name;filterEl.appendChild(o);});
+    // Aggiorna cache per filterDropdown (cross-browser)
+    _selectAllOptions['ci-cliente-filter']=Array.from(filterEl.options).map(o=>({v:o.value,t:o.textContent}));
   }
   const selectedId=filterEl?.value||'';
   // Load from Supabase
-  let q=supa.from('checkins').select('*, profiles(nome,cognome,email)').order('created_at',{ascending:false}).limit(500);
-  if(selectedId) q=q.eq('cliente_id',selectedId);
+  let q=supa.from('checkins').select('*, profiles(nome,cognome,email)').order('created_at',{ascending:false});
+  if(selectedId){q=q.eq('cliente_id',selectedId).limit(18);}  // ~18 mesi per cliente
+  else{q=q.limit(720);}  // 18 mesi × 40 clienti
   const {data:ciData}=await q;
   if(!ciData?.length){el.innerHTML='<div class="card" style="text-align:center;padding:40px;color:var(--text2)">Nessun check-in ricevuto</div>';return;}
   // Raggruppa per cliente
@@ -3698,10 +3776,12 @@ async function renderAdminFeedback(skipRebuild){
   const el=document.getElementById('admin-feedback-list');
   if(!el)return;
   if(!skipRebuild){
+    // Carica lista clienti per il selector, poi feedback per cliente selezionata on-demand
+    // Prima: popola solo i nomi delle clienti che hanno feedback
     const {data:fbs,error:fbErr}=await supa.from('feedback_esercizi')
-      .select('*, profiles(nome,cognome,email)')
+      .select('cliente_id, created_at, profiles(nome,cognome,email)')
       .order('created_at',{ascending:false})
-      .limit(200);
+      .limit(500);
     if(!fbs?.length){
       el.innerHTML='<div class="card" style="text-align:center;padding:40px;color:var(--text2)"><div style="font-size:40px;margin-bottom:12px">💬</div><div>Nessun feedback ricevuto ancora</div></div>';
       return;
@@ -3727,9 +3807,16 @@ async function renderAdminFeedback(skipRebuild){
       </select>
     </div><div id="fb-cards"></div>`;
   }
-  // Render cards per cliente selezionata
+  // Carica feedback completi per cliente selezionata (on-demand)
   const cardsEl=document.getElementById('fb-cards');if(!cardsEl)return;
-  const filtered=(_feedbackAll||[]).filter(f=>f.cliente_id===_feedbackClienteId);
+  if(!_feedbackClienteId){cardsEl.innerHTML='';return;}
+  cardsEl.innerHTML='<div style="padding:20px;text-align:center;font-size:13px;color:var(--text3)">Caricamento...</div>';
+  const {data:clientFbs}=await supa.from('feedback_esercizi')
+    .select('*')
+    .eq('cliente_id',_feedbackClienteId)
+    .order('created_at',{ascending:false})
+    .limit(200);
+  const filtered=clientFbs||[];
   if(!filtered.length){
     cardsEl.innerHTML='<div style="font-size:13px;color:var(--text3);padding:20px;text-align:center">Nessun feedback da questa cliente</div>';
     return;
@@ -3778,7 +3865,7 @@ const DEMO_CHECKS = {};
 
 async function loadAdminQuestionariData() {
   // Load real anamnesi from DB
-  const {data:anData,error:anErr}=await supa.from('anamnesi').select('*, profiles(nome,cognome,email)');
+  const {data:anData,error:anErr}=await supa.from('anamnesi').select('*, profiles(nome,cognome,email)').limit(200);
   // Clear old data first
   Object.keys(DEMO_ANAMNESI).forEach(k=>delete DEMO_ANAMNESI[k]);
   Object.keys(DEMO_CHECKS).forEach(k=>delete DEMO_CHECKS[k]);
@@ -3789,7 +3876,7 @@ async function loadAdminQuestionariData() {
     });
   }
   // Load real check questionari
-  const {data:ckData,error:ckErr}=await supa.from('check_questionari').select('*, profiles(nome,cognome,email)').order('created_at',{ascending:false}).order('id',{ascending:false}).limit(100);
+  const {data:ckData,error:ckErr}=await supa.from('check_questionari').select('*, profiles(nome,cognome,email)').order('created_at',{ascending:false}).order('id',{ascending:false}).limit(400); // 10 per cliente × 40 clienti
   if(ckData?.length){
     ckData.forEach(c=>{
       const name=((c.profiles?.nome||'')+(c.profiles?.cognome?' '+c.profiles.cognome:'')).trim()||c.profiles?.email||'Cliente';
@@ -3819,10 +3906,10 @@ function filterQClients(){
   </select>`;
   if(filtered.length&&!filtered.includes(qSelectedClient)){qSelectedClient=filtered[0];renderQContent();}
 }
-async function renderAdminQuestionari() {
+async function renderAdminQuestionari(){
   await loadAdminQuestionariData();
-  _qAllNames = Object.keys(DEMO_ANAMNESI).filter(n=>DEMO_ANAMNESI[n]!==null||DEMO_CHECKS[n]?.length);
-  if(!qSelectedClient && _qAllNames.length) qSelectedClient=_qAllNames[0];
+  _qAllNames=Object.keys(DEMO_ANAMNESI).filter(n=>DEMO_ANAMNESI[n]!==null||DEMO_CHECKS[n]?.length);
+  if(!qSelectedClient&&_qAllNames.length)qSelectedClient=_qAllNames[0];
   filterQClients();
   renderQContent();
 }
