@@ -2886,14 +2886,21 @@ function filterDropdown(selectId, searchId, triggerFn){
   const q=(document.getElementById(searchId)?.value||'').toLowerCase();
   const curVal=sel.value;
   if(_CLIENT_SELECTS_CFG[selectId]!==undefined){
-    // Ricostruisce da clientiList — la cache non è affidabile perché il select
-    // potrebbe essere ancora vuoto quando filterDropdown viene chiamata la prima volta
     const placeholder=_CLIENT_SELECTS_CFG[selectId];
     const filtered=q ? clientiList.filter(cl=>cl.name.toLowerCase().includes(q)) : clientiList;
     sel.innerHTML=`<option value="">${placeholder}</option>`+
       filtered.map(cl=>`<option value="${cl.id}">${cl.name}</option>`).join('');
+    // Con query attiva: se il valore precedente è tra i risultati, mantienilo;
+    // altrimenti auto-seleziona il primo cliente trovato (non il placeholder)
+    if(q && filtered.length){
+      const match=filtered.find(cl=>cl.id===curVal);
+      sel.value=match?curVal:filtered[0].id;
+    } else {
+      // Nessuna query: ripristina selezione precedente o placeholder
+      const still=Array.from(sel.options).find(o=>o.value===curVal);
+      sel.value=still?curVal:'';
+    }
   } else {
-    // Per altri select: usa le opzioni esistenti nel DOM
     if(!sel._cachedOpts){
       sel._cachedOpts=Array.from(sel.options).map(o=>({v:o.value,t:o.textContent}));
     }
@@ -2901,11 +2908,10 @@ function filterDropdown(selectId, searchId, triggerFn){
       .filter(o=>o.v===''||!q||o.t.toLowerCase().includes(q))
       .map(o=>`<option value="${o.v}">${o.t}</option>`)
       .join('');
+    const still=Array.from(sel.options).find(o=>o.value===curVal);
+    sel.value=still?curVal:(sel.options[0]?.value||'');
   }
-  // Ripristina selezione precedente se disponibile
-  const still=Array.from(sel.options).find(o=>o.value===curVal);
-  sel.value=still?curVal:(sel.options[0]?.value||'');
-  // Callback
+  // Callback — per ci-cliente-filter trigga sempre renderAdminCi per aggiornare la lista
   if(selectId==='ci-cliente-filter') renderAdminCi();
   else if(typeof triggerFn==='function') triggerFn();
 }
