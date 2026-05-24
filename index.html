@@ -1643,13 +1643,13 @@ async function navigate(pg){
   if(pg==='chat')renderChat();
   if(pg==='profilo')renderProfilo();
   if(pg==='admin-dashboard')renderAdminDash();
-  if(pg==='admin-schede'){renderSchedeList();renderTemplatesList();if(!document.getElementById('days-container').children.length)addDay();const si=document.getElementById('s-start');if(si&&!si.value)si.value=new Date().toISOString().slice(0,10);checkDraftBanner();}
+  if(pg==='admin-schede'){populateClientDropdowns();renderSchedeList();renderTemplatesList();if(!document.getElementById('days-container').children.length)addDay();const si=document.getElementById('s-start');if(si&&!si.value)si.value=new Date().toISOString().slice(0,10);checkDraftBanner();}
   if(pg==='admin-libreria')renderLibrary();
   if(pg==='admin-piano')renderAdminPiano();
   if(pg==='risorse')renderRisorse();
   if(pg==='admin-risorse')renderAdminRisorse();
-  if(pg==='admin-promemoria')renderReminders();
-  if(pg==='admin-checkins')renderAdminCi();
+  if(pg==='admin-promemoria'){populateClientDropdowns();renderReminders();}
+  if(pg==='admin-checkins'){populateClientDropdowns();renderAdminCi();}
   if(pg==='admin-chat')renderAdminChat();
   if(pg==='admin-questionari')renderAdminQuestionari();
   if(pg==='admin-feedback')renderAdminFeedback();
