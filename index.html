@@ -809,7 +809,7 @@ input,textarea,select{font-family:'DM Sans',sans-serif}
           <div class="stat-card"><div class="stat-icon">💬</div><div class="stat-label">Clienti registrate</div><div class="stat-value" id="adm-msgs">0</div></div>
           <div class="stat-card"><div class="stat-icon">📋</div><div class="stat-label">Schede create</div><div class="stat-value" id="adm-schede-n">0</div></div>
         </div>
-        <div class="card"><div class="card-title" style="display:flex;justify-content:space-between;align-items:center">Le tue clienti <div style="display:flex;gap:6px;align-items:center"><button class="btn-ghost" style="font-size:12px;padding:6px 10px" onclick="navigate('admin-dashboard')" title="Ricarica lista">🔄</button><button class="btn-primary" style="font-size:12px;padding:7px 14px" onclick="openInviteModal()">✉️ Invita cliente</button></div></div>
+        <div class="card"><div class="card-title" style="display:flex;justify-content:space-between;align-items:center">Le tue clienti <div style="display:flex;gap:6px;align-items:center"><button class="btn-ghost" style="font-size:12px;padding:6px 10px" onclick="reloadDashboard()" title="Ricarica lista da Supabase">🔄</button><button class="btn-primary" style="font-size:12px;padding:7px 14px" onclick="openInviteModal()">✉️ Invita cliente</button></div></div>
           <table class="tbl"><thead><tr><th>Nome</th><th>Stato</th><th>Ultimo all.</th><th>Check-in</th><th>Aderenza</th><th>Azioni</th></tr></thead>
           <tbody id="admin-tbody"></tbody></table>
         </div>
@@ -2796,6 +2796,26 @@ function populateClientDropdowns(){
   });
   // ci-cliente-filter è popolato da renderAdminCi — invalida e basta
   delete _selectAllOptions['ci-cliente-filter'];
+}
+async function reloadDashboard(){
+  // Re-fetch completo da Supabase — bypassa la cache in memoria
+  const {data:allProfiles,error:profErr}=await supa.from('profiles').select('*').eq('role','cliente');
+  if(profErr){toast('❌ Errore caricamento profili: '+profErr.message);console.error(profErr);return;}
+  if(allProfiles?.length){
+    const clientIds=allProfiles.map(p=>p.id);
+    const sessPromises=clientIds.map(id=>supa.from('sessioni').select('cliente_id,data_sessione').eq('cliente_id',id).eq('completata',true).order('data_sessione',{ascending:false}).limit(1).maybeSingle());
+    const ciPromises=clientIds.map(id=>supa.from('checkins').select('cliente_id,data_checkin').eq('cliente_id',id).order('data_checkin',{ascending:false}).limit(1).maybeSingle());
+    const [sessResults,ciResults]=await Promise.all([Promise.all(sessPromises),Promise.all(ciPromises)]);
+    const lastSessionMap={};const lastCiMap={};
+    sessResults.forEach(r=>{if(r.data)lastSessionMap[r.data.cliente_id]=r.data.data_sessione;});
+    ciResults.forEach(r=>{if(r.data)lastCiMap[r.data.cliente_id]=r.data.data_checkin;});
+    const fmt=(d)=>{if(!d)return '—';const dt=new Date(d);const days=Math.floor((new Date()-dt)/86400000);if(days===0)return 'Oggi';if(days===1)return 'Ieri';return days+' gg fa';};
+    clientiList=allProfiles.map(p=>({id:p.id,name:((p.nome||'')+(p.cognome?' '+p.cognome:'')).trim()||p.email||'Cliente',email:p.email||'',stato:'attiva',lastW:fmt(lastSessionMap[p.id]),lastCI:fmt(lastCiMap[p.id]),ad:0}));
+  } else {
+    clientiList=[];
+    if(!profErr) toast('⚠️ Nessun profilo cliente trovato — controlla le policy RLS su Supabase');
+  }
+  renderAdminDash();
 }
 async function renderAdminDash(){
   const list = clientiList.length ? clientiList : [];
