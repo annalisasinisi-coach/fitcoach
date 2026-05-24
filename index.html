@@ -1570,16 +1570,20 @@ async function loadUserData(){
       if(schedeData?.length){
         schedeList=schedeData.map(s=>({id:s.id,nome:s.nome,clienteId:s.cliente_id,weeks:s.weeks,start:s.start_date,data:s.created_at?.slice(0,10)}));
       } else { schedeList=[]; }
-      // Load all messages for admin chat — use plain select (no join to avoid FK-name issues)
-      const {data:allMsgs}=await supa.from('messaggi').select('*').order('created_at',{ascending:false}).limit(500);
-      if(allMsgs?.length){
+      // Messaggi coach: carica solo l'ultimo messaggio per ogni cliente (preview lista)
+      // I messaggi completi vengono caricati on-demand in selAdminChat()
+      const {data:previewMsgs}=await supa.from('messaggi').select('mittente_id,destinatario_id,testo,tipo,file_nome,created_at').order('created_at',{ascending:false}).limit(200);
+      if(previewMsgs?.length){
         adminChatData={};
-        allMsgs.forEach(m=>{
+        previewMsgs.forEach(m=>{
           const isFromCoach=m.mittente_id===user.id;
           const otherId=isFromCoach?m.destinatario_id:m.mittente_id;
           if(!otherId)return;
-          if(!adminChatData[otherId])adminChatData[otherId]={msgs:[]};
-          adminChatData[otherId].msgs.push({from:isFromCoach?'coach':'cliente',text:m.testo||'',time:new Date(m.created_at).toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'}),type:m.tipo||'text',fname:m.file_nome});
+          if(!adminChatData[otherId])adminChatData[otherId]={msgs:[],loaded:false};
+          // Aggiungi solo se non abbiamo ancora 1 messaggio di preview (il più recente)
+          if(adminChatData[otherId].msgs.length===0){
+            adminChatData[otherId].msgs.push({from:isFromCoach?'coach':'cliente',text:m.testo||'',time:new Date(m.created_at).toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'}),type:m.tipo||'text',fname:m.file_nome});
+          }
         });
       }
     }
@@ -1661,8 +1665,8 @@ async function renderHome(){
   if(sesEl){
     // Load real sessions from Supabase
     if(user?.id){
-      const {data:sessData}=await supa.from('sessioni').select('id',{count:'exact',head:false}).eq('cliente_id',user.id).eq('completata',true).limit(1000);
-      sesEl.textContent=sessData?.length||0;
+      const {count:sessCount}=await supa.from('sessioni').select('*',{count:'exact',head:true}).eq('cliente_id',user.id).eq('completata',true);
+      sesEl.textContent=sessCount||0;
     } else sesEl.textContent='0';
   }
   const pesoEl=document.getElementById('home-peso');
@@ -2746,6 +2750,8 @@ async function saveProfilo(){
 // ADMIN
 // ══════════════════════════════════
 function populateClientDropdowns(){
+  // Invalida la cache delle opzioni filtrate (verranno rigenerate al prossimo filterDropdown)
+  ['s-cliente','ap-cliente','rem-cliente','ci-cliente-filter'].forEach(id=>delete _selectAllOptions[id]);
   const selects=['s-cliente','ap-cliente','rem-cliente'];
   selects.forEach(id=>{
     const el=document.getElementById(id);
@@ -2838,22 +2844,29 @@ function initBuilderDrag(container){
 // ── SEARCH HELPERS ─────────────────────────────────────────
 // Filtra le opzioni di un <select> in base a un <input> di ricerca
 // withAll: se true mantiene "Tutte le clienti" come prima opzione
-function filterDropdown(selectId, searchId, withAll){
+// _selectAllOptions: cache delle opzioni originali per ogni select
+const _selectAllOptions={};
+function filterDropdown(selectId, searchId, triggerFn){
   const sel=document.getElementById(selectId);
-  const q=(document.getElementById(searchId)?.value||'').toLowerCase();
   if(!sel)return;
-  Array.from(sel.options).forEach(opt=>{
-    if(opt.value===''){ opt.style.display=''; return; } // "tutte" sempre visibile
-    opt.style.display=(!q||opt.textContent.toLowerCase().includes(q))?'':'none';
-  });
-  // Se il valore selezionato è ora nascosto, resetta
-  const cur=sel.options[sel.selectedIndex];
-  if(cur&&cur.style.display==='none'){
-    const first=Array.from(sel.options).find(o=>o.style.display!=='none');
-    if(first)sel.value=first.value;
+  // Salva le opzioni originali la prima volta (nome + value)
+  if(!_selectAllOptions[selectId]){
+    _selectAllOptions[selectId]=Array.from(sel.options).map(o=>({v:o.value,t:o.textContent}));
   }
-  // Per check-in, trigger renderAdminCi al cambio
-  if(selectId==='ci-cliente-filter')renderAdminCi();
+  const q=(document.getElementById(searchId)?.value||'').toLowerCase();
+  const all=_selectAllOptions[selectId];
+  const curVal=sel.value;
+  // Ricostruisce le opzioni filtrate (cross-browser: display:none non funziona su <option> in Safari)
+  sel.innerHTML=all
+    .filter(o=>o.v===''||!q||o.t.toLowerCase().includes(q))
+    .map(o=>`<option value="${o.v}">${o.t}</option>`)
+    .join('');
+  // Ripristina selezione precedente se ancora presente, altrimenti prima disponibile
+  const still=Array.from(sel.options).find(o=>o.value===curVal);
+  sel.value=still?curVal:(sel.options[0]?.value||'');
+  // Callback opzionale (es. renderAdminCi per check-in)
+  if(typeof triggerFn==='function')triggerFn();
+  else if(selectId==='ci-cliente-filter')renderAdminCi();
 }
 
 // Filtra la lista contatti nella chat coach
@@ -3574,7 +3587,7 @@ function renderAdminChat(){
     </div>`;
   }).join('');
 }
-function selAdminChat(clientId,clientName){
+async function selAdminChat(clientId,clientName){
   adminChatClienteId=clientId;
   adminChatCliente=clientName;
   delete notifState.counts?.['admin-chat-'+clientId];
@@ -3586,6 +3599,28 @@ function selAdminChat(clientId,clientName){
     if(contacts)contacts.classList.add('mob-hidden');
     const backBtn=document.getElementById('mob-chat-back');
     if(backBtn)backBtn.style.display='block';
+  }
+  // Carica messaggi completi on-demand (50 per cliente) solo se non già caricati
+  if(!adminChatData[clientId])adminChatData[clientId]={msgs:[],loaded:false};
+  if(!adminChatData[clientId].loaded){
+    try{
+      const coachId='b2c195ac-6887-41d9-bfa4-7ec254b4df22';
+      const {data:msgs}=await supa.from('messaggi').select('*')
+        .or(`and(mittente_id.eq.${clientId},destinatario_id.eq.${coachId}),and(mittente_id.eq.${coachId},destinatario_id.eq.${clientId})`)
+        .order('created_at',{ascending:true})
+        .limit(50);
+      if(msgs?.length){
+        adminChatData[clientId].msgs=msgs.map(m=>({
+          from:m.mittente_id===coachId?'coach':'cliente',
+          text:m.testo||'',
+          time:new Date(m.created_at).toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'}),
+          type:m.tipo||'text',fname:m.file_nome
+        }));
+      } else {
+        adminChatData[clientId].msgs=[];
+      }
+      adminChatData[clientId].loaded=true;
+    }catch(e){console.warn('load chat:',e);}
   }
   renderAdminChatMsgs();
   renderAdminChat();
@@ -3621,8 +3656,9 @@ async function adminSendMsg(){
   if(!adminChatClienteId){toast('Seleziona prima una cliente dalla lista');return;}
   if(!text)return;
   const t=new Date().toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'});
-  if(!adminChatData[adminChatClienteId])adminChatData[adminChatClienteId]={msgs:[]};
+  if(!adminChatData[adminChatClienteId])adminChatData[adminChatClienteId]={msgs:[],loaded:true};
   adminChatData[adminChatClienteId].msgs.push({from:'coach',text,time:t,type:'text'});
+  adminChatData[adminChatClienteId].loaded=true;
   inp.value='';
   renderAdminChatMsgs();
   if(user?.id){
@@ -4483,8 +4519,9 @@ async function setupRealtimeChat(){
       } else {
         const senderId=m.mittente_id;
         const senderName=clientiList.find(c=>c.id===senderId)?.name||'Cliente';
-        if(!adminChatData[senderId])adminChatData[senderId]={msgs:[]};
+        if(!adminChatData[senderId])adminChatData[senderId]={msgs:[],loaded:true};
         adminChatData[senderId].msgs.push({from:'cliente',text:m.testo||'',time:t,type:m.tipo||'text'});
+        adminChatData[senderId].loaded=true;
         if(page==='admin-chat'){
           renderAdminChat();
           if(adminChatClienteId===senderId)renderAdminChatMsgs();
