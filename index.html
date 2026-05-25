@@ -26,6 +26,48 @@ img,video,iframe,canvas,input,select,textarea,button{max-width:100%}
   --shadow:0 2px 16px rgba(180,100,80,0.08);--shadow2:0 8px 32px rgba(180,100,80,0.14);
   --r:12px;--r2:18px;--r3:26px;--tr:0.2s ease;--sage:#5aaa7a;
 }
+/* ── DARK MODE ── */
+body.dark{
+  --rose:#F07898;--rose-l:#F8A0B8;--rose-pale:rgba(240,120,152,0.15);--rose-dim:rgba(240,120,152,0.08);
+  --violet:#B070D8;--violet-l:#C890E8;--violet-pale:rgba(176,112,216,0.15);
+  --peach:#F5A882;--peach-l:#FAC4A8;--peach-pale:rgba(245,168,130,0.12);
+  --bg:#1A1318;--bg2:#201820;--card:#26202A;--card2:#2C2430;
+  --warm:#2E2530;--warmb:#382C3C;
+  --border:rgba(180,130,200,0.13);--border2:rgba(180,130,200,0.22);
+  --text:#F0E8F4;--text2:#C0A8CC;--text3:#907898;
+  --shadow:0 2px 16px rgba(0,0,0,0.35);--shadow2:0 8px 32px rgba(0,0,0,0.5);
+  --sage:#6abf88;
+}
+body.dark .home-hero{background:linear-gradient(135deg,var(--card) 0%,rgba(176,112,216,0.12) 50%,rgba(240,120,152,0.1) 100%)}
+body.dark .topnav{background:var(--card);border-bottom-color:var(--border)}
+body.dark .sidebar{background:var(--card2);border-right-color:var(--border)}
+body.dark .modal-box{background:var(--card)}
+body.dark .role-tab.active{background:var(--warmb)}
+body.dark .day-tab.active{background:var(--warmb)}
+body.dark .chat-wrap{background:var(--card)}
+body.dark .chat-input-area{background:var(--card)}
+body.dark .admin-chat-grid{background:var(--card)}
+body.dark .attach-menu{background:var(--card)}
+body.dark .toast{background:var(--card)}
+body.dark input,body.dark textarea,body.dark select{background:var(--warm);color:var(--text)}
+body.dark .lf input:focus,body.dark .field input:focus,body.dark .field textarea:focus,body.dark .field select:focus,body.dark .chat-inp:focus,body.dark .weight-inp:focus,body.dark .fb-textarea:focus{background:var(--warmb)}
+body.dark .streak{background:var(--warmb)}
+body.dark .next-card{background:var(--card)}
+body.dark .ex-card{background:var(--card)}
+body.dark .rest-card{background:var(--card)}
+body.dark .ci-item{background:var(--card)}
+body.dark .q-block{background:var(--card)}
+body.dark .meal-card{background:var(--card)}
+body.dark .macro-ring-card{background:var(--card)}
+body.dark .day-builder{background:var(--card)}
+body.dark .reminder-item{background:var(--card)}
+body.dark .msg.recv .msg-bubble{background:var(--warmb);border-color:var(--border)}
+body.dark .ex-lib-card{background:var(--card)}
+body.dark .timer-btn,body.dark .timer-custom-inp{background:var(--warmb)}
+body.dark #lib-search,body.dark #lib-cat{background:var(--warmb);color:var(--text)}
+/* dark toggle button */
+.btn-dark-toggle{background:transparent;border:1.5px solid var(--border);border-radius:var(--r);color:var(--text2);font-size:16px;padding:4px 9px;transition:var(--tr);flex-shrink:0;line-height:1}
+.btn-dark-toggle:hover{border-color:var(--rose);color:var(--rose)}
 body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;line-height:1.5;overflow-x:hidden}
 h1,h2,h3{font-family:'Playfair Display',serif}
 button{cursor:pointer;font-family:'DM Sans',sans-serif}
@@ -255,7 +297,7 @@ input,textarea,select{font-family:'DM Sans',sans-serif}
 .attach-menu.open{display:flex}
 .attach-opt{display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:var(--r);background:transparent;border:none;color:var(--text2);font-size:13px;transition:var(--tr);cursor:pointer;width:100%;text-align:left}
 .attach-opt:hover{background:var(--warm);color:var(--text)}
-.chat-inp{flex:1;background:var(--warm);border:1.5px solid var(--border);border-radius:var(--r);padding:9px 14px;color:var(--text);font-size:13px;outline:none;resize:none;max-height:90px}
+.chat-inp{flex:1;background:var(--warm);border:1.5px solid var(--border);border-radius:var(--r);padding:9px 14px;color:var(--text);font-size:13px;outline:none;resize:none;min-height:38px;max-height:140px;overflow-y:auto;line-height:1.45;transition:border-color var(--tr),background var(--tr)}
 .chat-inp:focus{border-color:var(--rose);background:#fff}
 .btn-send{background:linear-gradient(135deg,var(--rose),var(--violet));border:none;border-radius:50%;color:#fff;font-size:15px;width:38px;height:38px;flex-shrink:0;transition:var(--tr);display:flex;align-items:center;justify-content:center}
 .btn-send:hover{transform:scale(1.05)}
@@ -493,6 +535,7 @@ input,textarea,select{font-family:'DM Sans',sans-serif}
     </div>
     <span class="topnav-role" id="nav-role"></span>
     <span class="nav-user" id="nav-user"></span>
+    <button class="btn-dark-toggle" id="btn-dark-toggle" onclick="toggleDarkMode()" title="Modalità notturna">🌙</button>
     <button class="btn-logout" id="btn-logout">Esci</button>
   </nav>
   <div class="app-body">
@@ -1270,6 +1313,37 @@ let _selectAllOptions={}; // cache opzioni select cliente (populateClientDropdow
 // AUTH — SUPABASE
 // ══════════════════════════════════
 let role='cliente',user=null,userProfile=null,page='',currentDay=0;
+
+// ── DARK MODE ──
+function toggleDarkMode(){
+  const isDark=document.body.classList.toggle('dark');
+  localStorage.setItem('asfc4_dark',isDark?'1':'0');
+  document.getElementById('btn-dark-toggle').textContent=isDark?'☀️':'🌙';
+}
+(function initDark(){
+  const saved=localStorage.getItem('asfc4_dark');
+  if(saved==='1'){document.body.classList.add('dark');const b=document.getElementById('btn-dark-toggle');if(b)b.textContent='☀️';}
+})();
+
+// ── CHAT INPUT AUTO-RESIZE (WhatsApp style) ──
+function autoResizeChatInp(el){
+  el.style.height='auto';
+  el.style.height=Math.min(el.scrollHeight,140)+'px';
+}
+function initChatAutoResize(){
+  ['chat-inp','admin-chat-inp'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(!el||el._arInited)return;
+    el._arInited=true;
+    el.addEventListener('input',()=>autoResizeChatInp(el));
+    el.addEventListener('keydown',e=>{
+      if(e.key==='Enter'&&!e.shiftKey){
+        // reset height after send (handled by existing chatKey/adminChatKey)
+        setTimeout(()=>{el.style.height='auto';},50);
+      }
+    });
+  });
+}
 async function setRole(r){role=r;}
 let loginRole='cliente'; // selected in login screen
 function setLoginRole(r){
@@ -1655,6 +1729,8 @@ async function navigate(pg){
   if(pg==='admin-chat')renderAdminChat();
   if(pg==='admin-questionari')renderAdminQuestionari();
   if(pg==='admin-feedback')renderAdminFeedback();
+  // init chat auto-resize whenever we navigate (idempotent)
+  setTimeout(initChatAutoResize,100);
   if(pg==='admin-analytics')renderAdminAnalytics();
 }
 
@@ -2693,6 +2769,7 @@ async function sendMsg(){
   chatMsgs.push({from:'me',text,time:t,type:'text'});
   ss('chat',chatMsgs);
   inp.value='';
+  inp.style.height='auto';
   renderChat();
   if(user?.id){
     try{
@@ -3774,6 +3851,7 @@ async function adminSendMsg(){
   adminChatData[adminChatClienteId].msgs.push({from:'coach',text,time:t,type:'text'});
   adminChatData[adminChatClienteId].loaded=true;
   inp.value='';
+  inp.style.height='auto';
   renderAdminChatMsgs();
   if(user?.id){
     try{
