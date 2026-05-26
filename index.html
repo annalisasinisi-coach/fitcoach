@@ -425,11 +425,19 @@ input,textarea,select{font-family:'DM Sans',sans-serif}
   .tbl,.tbl tbody,.tbl tr,.tbl td{display:block!important;width:100%!important}
   .tbl tr{background:var(--card);border:1.5px solid var(--border);border-radius:var(--r2);margin-bottom:8px;padding:12px;box-shadow:var(--shadow)}
   .tbl td{padding:3px 0;border:none;font-size:13px}
-  /* Admin chat */
+  /* Chat cliente — full height mobile */
+  .chat-input-area{padding:8px}
+  #page-chat.active{height:calc(100dvh - 84px);display:flex;flex-direction:column;padding:0!important}
+  #page-chat.active .chat-wrap{max-height:none;height:100%!important;border-radius:0;border-left:none;border-right:none;border-bottom:none}
+  #page-chat .page-title, #page-chat .page-sub{display:none}
+  /* Chat coach — full height mobile */
+  #page-admin-chat.active{height:calc(100dvh - 84px);display:flex;flex-direction:column;padding:0!important}
+  #page-admin-chat .page-title, #page-admin-chat .page-sub{display:none}
+  #page-admin-chat.active .admin-chat-grid{height:100%!important;border-radius:0;border:none;box-shadow:none;display:flex;flex-direction:column}
   .admin-chat-grid{grid-template-columns:1fr!important;height:auto!important}
-  .admin-chat-contacts{border-right:none!important;border-bottom:1px solid var(--border);max-height:200px;overflow-y:auto}
+  .admin-chat-contacts{border-right:none!important;border-bottom:1px solid var(--border);height:auto!important;flex-shrink:0;max-height:220px;overflow-y:auto}
   .admin-chat-contacts.mob-hidden{display:none!important}
-  #admin-chat-msgs{min-height:240px!important;max-height:340px}
+  #admin-chat-msgs{min-height:0!important;max-height:none!important;flex:1}
   /* Builder – layout esplicito su mobile */
   .ex-builder-row{flex-direction:row!important;flex-wrap:wrap!important;gap:5px!important;align-items:flex-end}
   .eb-field-name{flex:0 0 100%!important;max-width:100%!important;min-width:0!important}
@@ -461,11 +469,6 @@ input,textarea,select{font-family:'DM Sans',sans-serif}
   #lib-search{width:100%!important}
   /* Timer custom */
   .timer-custom-row{flex-wrap:wrap}
-  /* Chat */
-  .chat-input-area{padding:8px}
-  #page-chat{height:calc(100dvh - 84px);display:flex;flex-direction:column;padding:0!important}
-  .chat-wrap{max-height:none;height:100%!important;border-radius:0;border-left:none;border-right:none;border-bottom:none}
-  #page-chat .page-title, #page-chat .page-sub{display:none}
   /* Profile grid */
   .emoji-picker{gap:5px}
   /* Q scale buttons */
