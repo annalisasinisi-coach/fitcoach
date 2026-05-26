@@ -425,6 +425,11 @@ input,textarea,select{font-family:'DM Sans',sans-serif}
   .tbl,.tbl tbody,.tbl tr,.tbl td{display:block!important;width:100%!important}
   .tbl tr{background:var(--card);border:1.5px solid var(--border);border-radius:var(--r2);margin-bottom:8px;padding:12px;box-shadow:var(--shadow)}
   .tbl td{padding:3px 0;border:none;font-size:13px}
+  /* Admin chat */
+  .admin-chat-grid{grid-template-columns:1fr!important;height:auto!important}
+  .admin-chat-contacts{border-right:none!important;border-bottom:1px solid var(--border);flex-shrink:0;max-height:220px;overflow-y:auto}
+  .admin-chat-contacts.mob-hidden{display:none!important}
+  #admin-chat-msgs{min-height:0!important;max-height:none!important;flex:1}
   /* Chat cliente — full height mobile */
   .chat-input-area{padding:8px}
   #page-chat.active{height:calc(100dvh - 84px);display:flex;flex-direction:column;padding:0!important}
@@ -434,10 +439,7 @@ input,textarea,select{font-family:'DM Sans',sans-serif}
   #page-admin-chat.active{height:calc(100dvh - 84px);display:flex;flex-direction:column;padding:0!important}
   #page-admin-chat .page-title, #page-admin-chat .page-sub{display:none}
   #page-admin-chat.active .admin-chat-grid{height:100%!important;border-radius:0;border:none;box-shadow:none;display:flex;flex-direction:column}
-  .admin-chat-grid{grid-template-columns:1fr!important;height:auto!important}
-  .admin-chat-contacts{border-right:none!important;border-bottom:1px solid var(--border);height:auto!important;flex-shrink:0;max-height:220px;overflow-y:auto}
-  .admin-chat-contacts.mob-hidden{display:none!important}
-  #admin-chat-msgs{min-height:0!important;max-height:none!important;flex:1}
+  #page-admin-chat.active .admin-chat-convo{flex:1;min-height:0;overflow:hidden}
   /* Builder – layout esplicito su mobile */
   .ex-builder-row{flex-direction:row!important;flex-wrap:wrap!important;gap:5px!important;align-items:flex-end}
   .eb-field-name{flex:0 0 100%!important;max-width:100%!important;min-width:0!important}
@@ -1075,7 +1077,7 @@ input,textarea,select{font-family:'DM Sans',sans-serif}
             </div>
             <div id="admin-chat-list"></div>
           </div>
-          <div style="display:flex;flex-direction:column;overflow:hidden;min-height:0">
+          <div class="admin-chat-convo" style="display:flex;flex-direction:column;overflow:hidden;min-height:0">
             <div style="padding:12px 16px;border-bottom:1px solid var(--border);background:linear-gradient(135deg,var(--rose-pale),var(--peach-pale));font-size:14px;font-weight:600;color:var(--text);display:flex;align-items:center;gap:8px">
               <button id="mob-chat-back" onclick="mobChatBack()" style="display:none;background:transparent;border:none;font-size:20px;cursor:pointer;color:var(--text2);padding:0 4px">‹</button>
               <span id="admin-chat-name">Seleziona una cliente</span>
@@ -3804,7 +3806,7 @@ function renderAdminChat(){
     const preview=lastMsg?.text||'Nessun messaggio';
     const unread=notifState.counts?.['admin-chat-'+c.id]||0;
     const isSel=c.id===adminChatClienteId;
-    return `<div onclick="selAdminChat('${c.id}','${c.name.replace(/'/g,"\\'")}')" style="padding:12px 14px;cursor:pointer;border-bottom:1px solid var(--border);background:${isSel?'#fff':'transparent'};display:flex;flex-direction:column;gap:2px">
+    return `<div onclick="selAdminChat('${c.id}','${c.name.replace(/'/g,"\\'")}')" style="padding:12px 14px;cursor:pointer;border-bottom:1px solid var(--border);background:${isSel?'var(--rose-pale)':'transparent'};display:flex;flex-direction:column;gap:2px">
       <div style="display:flex;justify-content:space-between;align-items:center">
         <div style="font-size:13px;font-weight:600">${c.name}</div>
         ${unread?`<span style="min-width:16px;height:16px;border-radius:10px;background:var(--rose);color:#fff;font-size:10px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;padding:0 3px">${unread}</span>`:''}
