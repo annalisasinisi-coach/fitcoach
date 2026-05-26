@@ -423,7 +423,7 @@ input,textarea,select{font-family:'DM Sans',sans-serif}
   /* Table → cards */
   .tbl thead{display:none}
   .tbl,.tbl tbody,.tbl tr,.tbl td{display:block!important;width:100%!important}
-  .tbl tr{background:#fff;border:1.5px solid var(--border);border-radius:var(--r2);margin-bottom:8px;padding:12px;box-shadow:var(--shadow)}
+  .tbl tr{background:var(--card);border:1.5px solid var(--border);border-radius:var(--r2);margin-bottom:8px;padding:12px;box-shadow:var(--shadow)}
   .tbl td{padding:3px 0;border:none;font-size:13px}
   /* Admin chat */
   .admin-chat-grid{grid-template-columns:1fr!important;height:auto!important}
@@ -463,7 +463,8 @@ input,textarea,select{font-family:'DM Sans',sans-serif}
   .timer-custom-row{flex-wrap:wrap}
   /* Chat */
   .chat-input-area{padding:8px}
-  .chat-wrap{max-height:none;height:calc(100dvh - 200px)!important}
+  #page-chat{height:calc(100dvh - 84px);display:flex;flex-direction:column;padding:0!important}
+  .chat-wrap{max-height:none;height:100%!important;border-radius:0;border-left:none;border-right:none;border-bottom:none}
   #page-chat .page-title, #page-chat .page-sub{display:none}
   /* Profile grid */
   .emoji-picker{gap:5px}
