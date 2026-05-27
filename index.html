@@ -4468,36 +4468,55 @@ async function viewClient(clientId, clientName){
       const pianoRow=piano?.[0];
       html+=`<details style="margin-bottom:16px;border:1.5px solid var(--border);border-radius:var(--r2);overflow:hidden">
         <summary style="padding:10px 14px;cursor:pointer;background:var(--warm);font-size:11px;text-transform:uppercase;letter-spacing:0.06em;color:var(--text3);font-weight:600;list-style:none;display:flex;justify-content:space-between;align-items:center;user-select:none">
-          <span>🥗 PIANO ALIMENTARE${pianoRow?' ('+( pianoRow.pasti?.length||0)+' pasti)':''}</span><span style="font-size:12px">▼</span>
+          <span>🥗 PIANO ALIMENTARE${pianoRow?' ('+(pianoRow.pasti||[]).filter(x=>x._type==='macroset').length+' set macros · '+(pianoRow.pasti||[]).filter(x=>x._type!=='macroset').length+' pasti)':''}</span><span style="font-size:12px">▼</span>
         </summary>
         <div style="padding:10px 14px;background:var(--bg2)">`;
       if(pianoRow){
-        html+=`<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:10px;padding:8px 12px;background:var(--warm);border-radius:var(--r)">
-          ${pianoRow.prot_g?`<span style="font-size:12px">🥩 <strong>${pianoRow.prot_g}g</strong> prot</span>`:''}
-          ${pianoRow.carb_g?`<span style="font-size:12px">🌾 <strong>${pianoRow.carb_g}g</strong> carb</span>`:''}
-          ${pianoRow.fat_g?`<span style="font-size:12px">🥑 <strong>${pianoRow.fat_g}g</strong> grassi</span>`:''}
-          ${pianoRow.kcal?`<span style="font-size:12px">🔥 <strong>${pianoRow.kcal}</strong> kcal</span>`:''}
-        </div>`;
-        html+=`<details style="margin-top:8px;border:1px solid var(--border);border-radius:var(--r2);overflow:hidden">
-          <summary style="padding:9px 13px;cursor:pointer;background:var(--warm);list-style:none;display:flex;justify-content:space-between;align-items:center;user-select:none">
-            <span style="font-size:12px;font-weight:600">🍽️ Pasti assegnati</span>
-            <span style="font-size:11px;color:var(--text3)">${pianoRow.pasti?.length||0} pasti ▼</span>
-          </summary>
-          <div style="padding:8px 13px;background:var(--bg2)">
-            ${pianoRow.pasti?.length?pianoRow.pasti.map(m=>`
-              <details style="margin-bottom:5px;border:1px solid var(--border);border-radius:var(--r);overflow:hidden">
-                <summary style="padding:7px 11px;cursor:pointer;background:var(--warm);list-style:none;display:flex;justify-content:space-between;align-items:center;user-select:none">
-                  <span style="font-size:12px;font-weight:600">${m.nome}</span>
-                  <span style="font-size:11px;color:var(--rose)">${m.k||0} kcal ▼</span>
-                </summary>
-                <div style="padding:7px 11px;background:var(--bg2);font-size:12px">
-                  <div style="color:var(--text2);margin-bottom:3px">P:${m.p||0}g · C:${m.c||0}g · G:${m.f||0}g</div>
-                  ${m.foods?`<div style="color:var(--text3)">${m.foods}</div>`:''}
-                </div>
-              </details>`).join(''):'<div style="font-size:13px;color:var(--text3);font-style:italic">Nessun pasto assegnato</div>'}
-          </div>
-        </details>`;
-      } else {
+        const _macrosets=(pianoRow.pasti||[]).filter(x=>x._type==='macroset');
+        const _pasti=(pianoRow.pasti||[]).filter(x=>x._type!=='macroset');
+        // Macros sets
+        if(_macrosets.length){
+          html+=`<div style="margin-bottom:10px">`;
+          _macrosets.forEach(s=>{
+            html+=`<div style="background:var(--warm);border:1.5px solid var(--border);border-radius:var(--r2);padding:10px 12px;margin-bottom:6px">
+              <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--violet);margin-bottom:6px">${s.nome}</div>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;font-size:12px">
+                <span>🥩 <strong>${s.prot}g</strong> prot</span>
+                <span>🌾 <strong>${s.carb}g</strong> carb</span>
+                <span>🥑 <strong>${s.fat}g</strong> grassi</span>
+                <span>🔥 <strong>${s.kcal}</strong> kcal</span>
+              </div></div>`;
+          });
+          html+=`</div>`;
+        } else {
+          html+=`<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:10px;padding:8px 12px;background:var(--warm);border-radius:var(--r)">
+            ${pianoRow.prot_g?`<span style="font-size:12px">🥩 <strong>${pianoRow.prot_g}g</strong> prot</span>`:''}
+            ${pianoRow.carb_g?`<span style="font-size:12px">🌾 <strong>${pianoRow.carb_g}g</strong> carb</span>`:''}
+            ${pianoRow.fat_g?`<span style="font-size:12px">🥑 <strong>${pianoRow.fat_g}g</strong> grassi</span>`:''}
+            ${pianoRow.kcal?`<span style="font-size:12px">🔥 <strong>${pianoRow.kcal}</strong> kcal</span>`:''}
+          </div>`;
+        }
+        if(_pasti.length){
+          html+=`<details style="margin-top:8px;border:1px solid var(--border);border-radius:var(--r2);overflow:hidden">
+            <summary style="padding:9px 13px;cursor:pointer;background:var(--warm);list-style:none;display:flex;justify-content:space-between;align-items:center;user-select:none">
+              <span style="font-size:12px;font-weight:600">🍽️ Pasti assegnati</span>
+              <span style="font-size:11px;color:var(--text3)">${_pasti.length} pasti ▼</span>
+            </summary>
+            <div style="padding:8px 13px;background:var(--bg2)">
+              ${_pasti.map(m=>`
+                <details style="margin-bottom:5px;border:1px solid var(--border);border-radius:var(--r);overflow:hidden">
+                  <summary style="padding:7px 11px;cursor:pointer;background:var(--warm);list-style:none;display:flex;justify-content:space-between;align-items:center;user-select:none">
+                    <span style="font-size:12px;font-weight:600">${m.nome}</span>
+                    <span style="font-size:11px;color:var(--rose)">${m.k||0} kcal ▼</span>
+                  </summary>
+                  <div style="padding:7px 11px;background:var(--bg2);font-size:12px">
+                    <div style="color:var(--text2);margin-bottom:3px">P:${m.p||0}g · C:${m.c||0}g · G:${m.f||0}g</div>
+                    ${m.foods?`<div style="color:var(--text3)">${m.foods}</div>`:''}
+                  </div>
+                </details>`).join('')}
+            </div>
+          </details>`;
+        }
         html+=`<div style="font-size:13px;color:var(--text3);font-style:italic">Nessun piano alimentare assegnato</div>`;
       }
       html+='</div></details>';
