@@ -2813,10 +2813,7 @@ async function sendMsg(){
   renderChat();
   if(user?.id){
     try{
-      const {data:coaches,error:cErr}=await supa.from('profiles').select('id').eq('role','admin').limit(1);
-      if(cErr){console.error('sendMsg — fetch coach error:',cErr);toast('❌ Errore: '+cErr.message);return;}
-      const coachId=coaches?.[0]?.id;
-      if(!coachId){toast('⚠️ Coach non trovata nel DB');return;}
+      const coachId='b2c195ac-6887-41d9-bfa4-7ec254b4df22';
       const {data:msgData,error:msgErr}=await supa.from('messaggi').insert({mittente_id:user.id,destinatario_id:coachId,testo:text,tipo:'text'}).select();
       if(msgErr){
         console.error('sendMsg — INSERT error:',msgErr);
