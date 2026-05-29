@@ -100,7 +100,7 @@ input,textarea,select{font-family:'DM Sans',sans-serif}
 .login-brand-sub{font-size:11px;color:var(--text3);letter-spacing:0.06em;text-align:center}
 .role-tabs{display:grid;grid-template-columns:1fr 1fr;gap:4px;background:var(--warm);padding:4px;border-radius:var(--r)}
 .role-tab{padding:9px;border:none;border-radius:10px;background:transparent;color:var(--text2);font-size:13px;font-weight:500;transition:var(--tr)}
-.role-tab.active{background:#fff;color:var(--rose);box-shadow:0 2px 8px rgba(180,80,80,0.12)}
+.role-tab.active{background:var(--card);color:var(--rose);box-shadow:0 2px 8px rgba(180,80,80,0.12)}
 .lf{display:flex;flex-direction:column;gap:5px}
 .lf label{font-size:11px;color:var(--text3);letter-spacing:0.07em;text-transform:uppercase;font-weight:500}
 .lf input{background:var(--warm);border:1.5px solid var(--border);border-radius:var(--r);padding:10px 14px;color:var(--text);font-size:14px;outline:none;transition:border-color var(--tr)}
@@ -353,7 +353,7 @@ input,textarea,select{font-family:'DM Sans',sans-serif}
 .macro-edit-field{display:flex;flex-direction:column;gap:4px}
 .macro-edit-field label{font-size:10px;text-transform:uppercase;letter-spacing:0.07em;color:var(--text3);font-weight:600}
 .macro-edit-field input{background:var(--warm);border:1.5px solid var(--border);border-radius:var(--r);padding:8px 10px;color:var(--text);font-size:14px;font-weight:600;outline:none;text-align:center}
-.macro-edit-field input:focus{border-color:var(--rose);background:#fff}
+.macro-edit-field input:focus{border-color:var(--rose);background:var(--bg2)}
 
 /* MODAL */
 .modal-overlay{position:fixed;inset:0;background:rgba(45,31,20,0.35);backdrop-filter:blur(4px);z-index:500;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity 0.2s}
@@ -923,7 +923,12 @@ input,textarea,select{font-family:'DM Sans',sans-serif}
               <div class="card-title" style="margin-bottom:10px">📁 Template salvati</div>
               <div id="templates-list" style="margin-top:6px"><div style="font-size:13px;color:var(--text3);font-style:italic">Nessun template.</div></div>
             </div>
-            <div class="card"><div class="card-title">Schede assegnate</div><div id="schede-list" style="margin-top:10px"></div></div>
+            <div class="card"><div class="card-title">Schede assegnate</div>
+              <div style="position:relative;margin-bottom:10px">
+                <span style="position:absolute;left:9px;top:50%;transform:translateY(-50%);color:var(--text3);font-size:12px;pointer-events:none">🔍</span>
+                <input type="text" id="schede-list-search" placeholder="Cerca cliente..." oninput="filterSchedeList(this.value)" style="width:100%;padding:6px 8px 6px 26px;border:1.5px solid var(--border);border-radius:var(--r);background:var(--bg2);color:var(--text);font-size:12px;outline:none">
+              </div>
+              <div id="schede-list" style="margin-top:10px"></div></div>
           </div>
         </div>
       </div>
@@ -3175,6 +3180,13 @@ async function renderSchedeList(){
         </div>`).join('')}
       </div>
     </details>`).join('');
+}
+function filterSchedeList(q){
+  const term=q.toLowerCase().trim();
+  document.querySelectorAll('#schede-list>details').forEach(el=>{
+    const name=el.querySelector('summary span')?.textContent||'';
+    el.style.display=(!term||name.toLowerCase().includes(term))?'':'none';
+  });
 }
 async function duplicaScheda(id){
   const {data}=await supa.from('schede').select('*').eq('id',id).maybeSingle();
