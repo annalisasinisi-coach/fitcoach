@@ -16,29 +16,29 @@
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 img,video,iframe,canvas,input,select,textarea,button{max-width:100%}
 :root{
-  --rose:#C4688A;--rose-l:#D4849E;--rose-pale:#FAE8F0;--rose-dim:rgba(196,104,138,0.1);
-  --violet:#7A3060;--violet-l:#9A4878;--violet-pale:#F2DFF0;
-  --peach:#E8C89A;--peach-l:#F0D8B4;--peach-pale:#FDF5EC;
-  --bg:#FFFCFE;--bg2:#F8F2F6;--card:#FFFFFF;--card2:#FDF8FB;
-  --warm:#F4EBF2;--warmb:#EBD8E6;
-  --border:rgba(196,104,138,0.15);--border2:rgba(196,104,138,0.28);
-  --text:#1C1018;--text2:#5C3850;--text3:#9A7090;
-  --shadow:0 2px 16px rgba(90,20,60,0.07);--shadow2:0 8px 32px rgba(90,20,60,0.13);
+  --rose:#E8527A;--rose-l:#F07898;--rose-pale:#FDE8EF;--rose-dim:rgba(232,82,122,0.1);
+  --violet:#7B3FA0;--violet-l:#9C5EC0;--violet-pale:#F0E6F8;
+  --peach:#F5A882;--peach-l:#FAC4A8;--peach-pale:#FEF0E8;
+  --bg:#FDFAF7;--bg2:#F8F2EC;--card:#FFFFFF;--card2:#FEF9F6;
+  --warm:#F7F0EB;--warmb:#EFE6DE;
+  --border:rgba(180,130,100,0.15);--border2:rgba(180,130,100,0.25);
+  --text:#2D1F14;--text2:#7A5A48;--text3:#B8937A;
+  --shadow:0 2px 16px rgba(180,100,80,0.08);--shadow2:0 8px 32px rgba(180,100,80,0.14);
   --r:12px;--r2:18px;--r3:26px;--tr:0.2s ease;--sage:#5aaa7a;
 }
 /* ── DARK MODE ── */
 body.dark{
-  --rose:#D4849E;--rose-l:#E09CB6;--rose-pale:rgba(212,132,158,0.15);--rose-dim:rgba(212,132,158,0.08);
-  --violet:#9A5080;--violet-l:#B86898;--violet-pale:rgba(154,80,128,0.15);
-  --peach:#C8A070;--peach-l:#D8B888;--peach-pale:rgba(200,160,112,0.12);
-  --bg:#130810;--bg2:#1C1018;--card:#241428;--card2:#2C1A30;
-  --warm:#381E34;--warmb:#442840;
-  --border:rgba(196,104,138,0.14);--border2:rgba(196,104,138,0.24);
-  --text:#F6EEF2;--text2:#C4A0B8;--text3:#886078;
-  --shadow:0 2px 16px rgba(0,0,0,0.38);--shadow2:0 8px 32px rgba(0,0,0,0.55);
+  --rose:#F07898;--rose-l:#F8A0B8;--rose-pale:rgba(240,120,152,0.15);--rose-dim:rgba(240,120,152,0.08);
+  --violet:#B070D8;--violet-l:#C890E8;--violet-pale:rgba(176,112,216,0.15);
+  --peach:#F5A882;--peach-l:#FAC4A8;--peach-pale:rgba(245,168,130,0.12);
+  --bg:#1A1318;--bg2:#201820;--card:#26202A;--card2:#2C2430;
+  --warm:#2E2530;--warmb:#382C3C;
+  --border:rgba(180,130,200,0.13);--border2:rgba(180,130,200,0.22);
+  --text:#F0E8F4;--text2:#C0A8CC;--text3:#907898;
+  --shadow:0 2px 16px rgba(0,0,0,0.35);--shadow2:0 8px 32px rgba(0,0,0,0.5);
   --sage:#6abf88;
 }
-body.dark .home-hero{background:linear-gradient(135deg,var(--card) 0%,rgba(154,80,128,0.12) 50%,rgba(196,104,138,0.09) 100%)}
+body.dark .home-hero{background:linear-gradient(135deg,var(--card) 0%,rgba(176,112,216,0.12) 50%,rgba(240,120,152,0.1) 100%)}
 body.dark .topnav{background:var(--card);border-bottom-color:var(--border)}
 body.dark .sidebar{background:var(--card2);border-right-color:var(--border)}
 body.dark .modal-box{background:var(--card)}
@@ -3932,6 +3932,14 @@ function filterFeedbackClients(){
     _feedbackClienteId=filtered[0][0];renderAdminFeedback(true);
   }
 }
+let _feedbackEsercizio='';
+function filterFeedbackEsercizio(q){
+  _feedbackEsercizio=q.toLowerCase().trim();
+  document.querySelectorAll('#fb-cards details').forEach(el=>{
+    const name=(el.querySelector('summary span')?.textContent||'').toLowerCase();
+    el.style.display=(!_feedbackEsercizio||name.includes(_feedbackEsercizio))?'':'none';
+  });
+}
 async function renderAdminFeedback(skipRebuild){
   const el=document.getElementById('admin-feedback-list');
   if(!el)return;
@@ -3957,14 +3965,20 @@ async function renderAdminFeedback(skipRebuild){
     _feedbackAllNames=Object.entries(clientiMap);
     if(!_feedbackClienteId||!clientiMap[_feedbackClienteId]) _feedbackClienteId=_feedbackAllNames[0]?.[0]||'';
     // Render header con search + select
-    el.innerHTML=`<div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
-      <div style="position:relative;flex:1;min-width:160px;max-width:260px">
-        <span style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--text3);font-size:13px;pointer-events:none">🔍</span>
-        <input id="fb-search" type="text" placeholder="Cerca cliente..." oninput="filterFeedbackClients()" style="width:100%;padding:8px 10px 8px 30px;border:1.5px solid var(--border);border-radius:var(--r2);background:var(--bg2);color:var(--text);font-size:13px;outline:none">
+    el.innerHTML=`<div style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px">
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <div style="position:relative;flex:1;min-width:160px;max-width:260px">
+          <span style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--text3);font-size:13px;pointer-events:none">🔍</span>
+          <input id="fb-search" type="text" placeholder="Cerca cliente..." oninput="filterFeedbackClients()" style="width:100%;padding:8px 10px 8px 30px;border:1.5px solid var(--border);border-radius:var(--r2);background:var(--bg2);color:var(--text);font-size:13px;outline:none">
+        </div>
+        <select id="fb-select" onchange="_feedbackClienteId=this.value;_feedbackEsercizio='';const es=document.getElementById('fb-ex-search');if(es)es.value='';renderAdminFeedback(true)" style="flex:1;min-width:160px;padding:8px 14px;border:1.5px solid var(--border);border-radius:var(--r2);background:var(--bg2);color:var(--text);font-size:13px;font-family:inherit;outline:none">
+          ${_feedbackAllNames.map(([id,n])=>`<option value="${id}" ${id===_feedbackClienteId?'selected':''}}>${n}</option>`).join('')}
+        </select>
       </div>
-      <select id="fb-select" onchange="_feedbackClienteId=this.value;renderAdminFeedback(true)" style="flex:1;min-width:160px;padding:8px 14px;border:1.5px solid var(--border);border-radius:var(--r2);background:var(--bg2);color:var(--text);font-size:13px;font-family:inherit;outline:none">
-        ${_feedbackAllNames.map(([id,n])=>`<option value="${id}" ${id===_feedbackClienteId?'selected':''}}>${n}</option>`).join('')}
-      </select>
+      <div style="position:relative;max-width:360px">
+        <span style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--text3);font-size:13px;pointer-events:none">🏋️</span>
+        <input id="fb-ex-search" type="text" placeholder="Filtra per esercizio..." oninput="filterFeedbackEsercizio(this.value)" style="width:100%;padding:8px 10px 8px 30px;border:1.5px solid var(--border);border-radius:var(--r2);background:var(--bg2);color:var(--text);font-size:13px;outline:none">
+      </div>
     </div><div id="fb-cards"></div>`;
   }
   // Carica feedback completi per cliente selezionata (on-demand)
@@ -4555,31 +4569,7 @@ async function viewClient(clientId, clientName){
     });}
     else html+=`<div style="font-size:13px;color:var(--text3);font-style:italic;padding:8px 0">Nessun peso registrato</div>`;
     html+='</div></div></details>';
-    // Feedback — collapsibili per data
-    html+=`<details style="margin-bottom:16px;border:1.5px solid var(--border);border-radius:var(--r2);overflow:hidden">
-      <summary style="padding:10px 14px;cursor:pointer;background:var(--warm);font-size:11px;text-transform:uppercase;letter-spacing:0.06em;color:var(--text3);font-weight:600;list-style:none;display:flex;justify-content:space-between;align-items:center">
-        <span>💬 FEEDBACK ALLENAMENTO (${feedbacks?.length||0})</span><span style="font-size:12px">▼</span>
-      </summary>
-      <div style="padding:10px 14px;background:var(--bg2)">
-        <div style="max-height:260px;overflow-y:auto;padding-right:2px">`;
-    if(feedbacks?.length){
-      const fbByEx={};
-      feedbacks.forEach(f=>{if(!fbByEx[f.esercizio_key])fbByEx[f.esercizio_key]=[];fbByEx[f.esercizio_key].push(f);});
-      html+=Object.entries(fbByEx).map(([ex,items])=>`
-        <details style="margin-bottom:5px;border:1px solid var(--border);border-radius:var(--r);overflow:hidden">
-          <summary style="padding:7px 11px;cursor:pointer;background:var(--warm);list-style:none;display:flex;justify-content:space-between;align-items:center;user-select:none">
-            <span style="font-size:12px;font-weight:600">${ex}</span>
-            <span style="font-size:11px;color:var(--text3)">${items.length} feedback ▼</span>
-          </summary>
-          <div style="padding:6px 11px;background:var(--bg2)">
-            ${items.map(f=>`<div style="font-size:12px;padding:4px 0;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;gap:8px">
-              <span>${f.emoji||''} ${f.testo?'"'+f.testo+'"':'<em style="color:var(--text3)">Solo emoji</em>'}</span>
-              <span style="color:var(--text3);white-space:nowrap">${new Date(f.created_at).toLocaleDateString('it-IT')}</span>
-            </div>`).join('')}
-          </div>
-        </details>`).join('');
-    } else html+=`<div style="font-size:13px;color:var(--text3);font-style:italic;padding:8px 0">Nessun feedback</div>`;
-    html+='</div></div></details>';
+
     mc.innerHTML=html;
   }catch(e){mc.innerHTML=`<div style="color:red;padding:20px">Errore: ${e.message}</div>`;}
 }
@@ -4651,8 +4641,8 @@ async function pollNotifications(){
           renderHome();
         }
       }
-      // Check promemoria: se quelli salvati in reminders non corrispondono al DB, ricarica
-      {
+      // Check promemoria: solo per clienti (la coach non deve ricevere notifica dei propri promemoria)
+      if(role==='cliente'){
         const today3=new Date().toISOString().slice(0,10);
         const {data:promFresh}=await supa.from('promemoria').select('id,data_promemoria,messaggio,created_at').eq('cliente_id',user.id).gte('data_promemoria',today3).order('data_promemoria');
         const freshIds=JSON.stringify((promFresh||[]).map(p=>p.id).sort());
@@ -4803,25 +4793,21 @@ async function setupRealtimeChat(){
   // ── CANALE CLIENTE (schede, piano, promemoria) ──
   if(myRole==='cliente'){
     makeChannel('cliente_'+user.id, ch=>{
-      ch.on('postgres_changes',{event:'*',schema:'public',table:'schede'},payload=>{
-        console.log('[CLIENTE] schede:',payload.eventType,payload.new?.cliente_id,'vs',user.id);
-        if(payload.new?.cliente_id!==user.id)return;
+      ch.on('postgres_changes',{event:'INSERT',schema:'public',table:'schede',filter:`cliente_id=eq.${user.id}`},payload=>{
         if(page!=='allenamento'){addNotif('allenamento',1);toast('📋 Annalisa ha assegnato una nuova scheda!');}
         else loadUserData().then(()=>renderWorkout());
       });
-      ch.on('postgres_changes',{event:'INSERT',schema:'public',table:'piani_alimentari'},payload=>{
-        console.log('[CLIENTE] piano INSERT:',payload.new?.cliente_id,'vs',user.id);
-        if(payload.new?.cliente_id!==user.id)return;
+      ch.on('postgres_changes',{event:'UPDATE',schema:'public',table:'schede',filter:`cliente_id=eq.${user.id}`},payload=>{
+        if(page!=='allenamento'){addNotif('allenamento',1);toast('📋 La tua scheda di allenamento è stata aggiornata!');}
+        else loadUserData().then(()=>renderWorkout());
+      });
+      ch.on('postgres_changes',{event:'INSERT',schema:'public',table:'piani_alimentari',filter:`cliente_id=eq.${user.id}`},payload=>{
         if(page!=='piano'){addNotif('piano',1);toast('🥗 Annalisa ha assegnato un piano alimentare!');}
       });
-      ch.on('postgres_changes',{event:'UPDATE',schema:'public',table:'piani_alimentari'},payload=>{
-        console.log('[CLIENTE] piano UPDATE:',payload.new?.cliente_id,'vs',user.id);
-        if(payload.new?.cliente_id!==user.id)return;
+      ch.on('postgres_changes',{event:'UPDATE',schema:'public',table:'piani_alimentari',filter:`cliente_id=eq.${user.id}`},payload=>{
         if(page!=='piano'){addNotif('piano',1);toast('🥗 Il tuo piano alimentare è stato aggiornato!');}
       });
       ch.on('postgres_changes',{event:'INSERT',schema:'public',table:'promemoria',filter:`cliente_id=eq.${user.id}`},payload=>{
-        // server-side filter già garantisce cliente_id===user.id
-        
         addNotif('home',1);toast('🔔 Nuovo promemoria da Annalisa!');
       });
     });
