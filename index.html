@@ -28,17 +28,17 @@ img,video,iframe,canvas,input,select,textarea,button{max-width:100%}
 }
 /* ── DARK MODE ── */
 body.dark{
-  --rose:#F07898;--rose-l:#F8A0B8;--rose-pale:rgba(240,120,152,0.15);--rose-dim:rgba(240,120,152,0.08);
-  --violet:#B070D8;--violet-l:#C890E8;--violet-pale:rgba(176,112,216,0.15);
-  --peach:#F5A882;--peach-l:#FAC4A8;--peach-pale:rgba(245,168,130,0.12);
-  --bg:#1A1318;--bg2:#201820;--card:#26202A;--card2:#2C2430;
-  --warm:#2E2530;--warmb:#382C3C;
-  --border:rgba(180,130,200,0.13);--border2:rgba(180,130,200,0.22);
-  --text:#F0E8F4;--text2:#C0A8CC;--text3:#907898;
-  --shadow:0 2px 16px rgba(0,0,0,0.35);--shadow2:0 8px 32px rgba(0,0,0,0.5);
+  --rose:#D4849E;--rose-l:#E09CB6;--rose-pale:rgba(212,132,158,0.15);--rose-dim:rgba(212,132,158,0.08);
+  --violet:#9A5080;--violet-l:#B86898;--violet-pale:rgba(154,80,128,0.15);
+  --peach:#C8A070;--peach-l:#D8B888;--peach-pale:rgba(200,160,112,0.12);
+  --bg:#130810;--bg2:#1C1018;--card:#241428;--card2:#2C1A30;
+  --warm:#381E34;--warmb:#442840;
+  --border:rgba(196,104,138,0.14);--border2:rgba(196,104,138,0.24);
+  --text:#F6EEF2;--text2:#C4A0B8;--text3:#886078;
+  --shadow:0 2px 16px rgba(0,0,0,0.38);--shadow2:0 8px 32px rgba(0,0,0,0.55);
   --sage:#6abf88;
 }
-body.dark .home-hero{background:linear-gradient(135deg,var(--card) 0%,rgba(176,112,216,0.12) 50%,rgba(240,120,152,0.1) 100%)}
+body.dark .home-hero{background:linear-gradient(135deg,var(--card) 0%,rgba(154,80,128,0.12) 50%,rgba(196,104,138,0.09) 100%)}
 body.dark .topnav{background:var(--card);border-bottom-color:var(--border)}
 body.dark .sidebar{background:var(--card2);border-right-color:var(--border)}
 body.dark .modal-box{background:var(--card)}
@@ -1019,6 +1019,24 @@ input,textarea,select{font-family:'DM Sans',sans-serif}
                 <option value="💪">💪 Allenamento</option><option value="🌸">🌸 Benessere</option><option value="📊">📊 Tabella</option>
                 <option value="🎥">🎥 Video</option><option value="🔗">🔗 Link</option>
               </select>
+            </div>
+            <!-- VISIBILITÀ -->
+            <div class="field">
+              <label>Visibilità</label>
+              <div style="display:flex;gap:6px;margin-bottom:10px">
+                <button id="res-vis-all" onclick="setRisorseVisibility('all')" class="btn-sm" style="flex:1;background:var(--rose);color:#fff;border:none;padding:8px;border-radius:var(--r);font-size:12px;font-weight:600;cursor:pointer">🌍 Tutte le clienti</button>
+                <button id="res-vis-sel" onclick="setRisorseVisibility('selected')" class="btn-sm" style="flex:1;background:var(--warm);color:var(--text2);border:1.5px solid var(--border);padding:8px;border-radius:var(--r);font-size:12px;font-weight:600;cursor:pointer">👥 Clienti selezionate</button>
+              </div>
+              <div id="res-clienti-picker" style="display:none;border:1.5px solid var(--border);border-radius:var(--r2);overflow:hidden">
+                <div style="padding:8px;background:var(--warm);border-bottom:1px solid var(--border)">
+                  <div style="position:relative">
+                    <span style="position:absolute;left:8px;top:50%;transform:translateY(-50%);font-size:12px;color:var(--text3);pointer-events:none">🔍</span>
+                    <input type="text" id="res-clienti-search" placeholder="Cerca cliente..." oninput="filterRisorseClients(this.value)" style="width:100%;padding:6px 8px 6px 24px;border:1.5px solid var(--border);border-radius:var(--r);background:var(--bg2);color:var(--text);font-size:12px;outline:none">
+                  </div>
+                </div>
+                <div id="res-clienti-list" style="max-height:180px;overflow-y:auto;background:var(--bg2)"></div>
+                <div id="res-clienti-chips" style="display:flex;flex-wrap:wrap;gap:5px;padding:8px;background:var(--warm);border-top:1px solid var(--border);min-height:36px"></div>
+              </div>
             </div>
             <button class="btn-primary" style="width:100%" onclick="addRisorsa()">Aggiungi risorsa</button>
           </div>
@@ -4197,14 +4215,20 @@ async function renderRisorse(){
     el.innerHTML='<div style="text-align:center;padding:40px"><div style="font-size:40px;margin-bottom:12px">📚</div><div style="font-size:15px;color:var(--text2)">Nessuna risorsa disponibile al momento.</div><div style="font-size:13px;color:var(--text3);margin-top:6px">Annalisa aggiungerà presto guide e materiali per te!</div></div>';
     return;
   }
-  el.innerHTML=`<div style="display:flex;flex-direction:column;gap:10px">`+data.map(r=>`
+  // Filtra: mostra se visibile a tutte (cliente_ids null/vuoto) o se include l'utente corrente
+  const visible=data.filter(r=>!r.cliente_ids||!r.cliente_ids.length||r.cliente_ids.includes(user?.id));
+  if(!visible.length){
+    el.innerHTML='<div style="text-align:center;padding:40px"><div style="font-size:40px;margin-bottom:12px">📚</div><div style="font-size:15px;color:var(--text2)">Nessuna risorsa disponibile al momento.</div><div style="font-size:13px;color:var(--text3);margin-top:6px">Annalisa aggiungerà presto guide e materiali per te!</div></div>';
+    return;
+  }
+  el.innerHTML=`<div style="display:flex;flex-direction:column;gap:10px">`+visible.map(r=>`
     <div style="background:var(--card);border:1.5px solid var(--border);border-radius:var(--r2);padding:16px 18px;display:flex;align-items:center;gap:14px;box-shadow:var(--shadow)">
       <div style="font-size:32px;flex-shrink:0">${r.emoji||'📄'}</div>
       <div style="flex:1;min-width:0">
         <div style="font-size:14px;font-weight:600;color:var(--text);margin-bottom:3px">${r.titolo||''}</div>
         ${r.descrizione?`<div style="font-size:12px;color:var(--text2);margin-bottom:8px;line-height:1.5">${r.descrizione}</div>`:''}
         <div style="display:flex;gap:8px;flex-wrap:wrap">
-          <a href="${r.url}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:5px;background:linear-gradient(135deg,var(--rose),var(--violet));color:#fff;border-radius:var(--r);padding:7px 16px;font-size:13px;font-weight:600;text-decoration:none;box-shadow:0 3px 10px rgba(232,82,122,0.25)">
+          <a href="${r.url}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:5px;background:linear-gradient(135deg,var(--rose),var(--violet));color:#fff;border-radius:var(--r);padding:7px 16px;font-size:13px;font-weight:600;text-decoration:none;box-shadow:0 3px 10px rgba(196,104,138,0.25)">
             ${r.tipo==='pdf_url'?'📄 Apri PDF':'🔗 Apri risorsa'}
           </a>
         </div>
@@ -4216,19 +4240,86 @@ function toggleRisorseInput(){
   // Both types use URL input - nothing to toggle for now
 }
 
+// ── RISORSE VISIBILITY ──
+let _risorseVisibility='all'; // 'all' | 'selected'
+let _risorseSelectedClients=[]; // [{id, name}]
+
+function setRisorseVisibility(mode){
+  _risorseVisibility=mode;
+  const btnAll=document.getElementById('res-vis-all');
+  const btnSel=document.getElementById('res-vis-sel');
+  const picker=document.getElementById('res-clienti-picker');
+  if(!btnAll||!btnSel||!picker)return;
+  if(mode==='all'){
+    btnAll.style.background='var(--rose)';btnAll.style.color='#fff';btnAll.style.border='none';
+    btnSel.style.background='var(--warm)';btnSel.style.color='var(--text2)';btnSel.style.border='1.5px solid var(--border)';
+    picker.style.display='none';
+  } else {
+    btnSel.style.background='var(--rose)';btnSel.style.color='#fff';btnSel.style.border='none';
+    btnAll.style.background='var(--warm)';btnAll.style.color='var(--text2)';btnAll.style.border='1.5px solid var(--border)';
+    picker.style.display='';
+    renderRisorseClientList('');
+  }
+}
+
+function renderRisorseClientList(filter){
+  const el=document.getElementById('res-clienti-list');if(!el)return;
+  const q=filter.toLowerCase();
+  const filtered=clientiList.filter(c=>!q||c.name.toLowerCase().includes(q));
+  if(!filtered.length){el.innerHTML='<div style="padding:10px 12px;font-size:12px;color:var(--text3);font-style:italic">Nessuna cliente trovata</div>';return;}
+  el.innerHTML=filtered.map(c=>{
+    const sel=_risorseSelectedClients.some(s=>s.id===c.id);
+    return `<label style="display:flex;align-items:center;gap:10px;padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--border);background:${sel?'var(--rose-pale)':'transparent'};transition:background 0.15s">
+      <input type="checkbox" ${sel?'checked':''} onchange="toggleRisorseClient('${c.id}','${c.name.replace(/'/g,"\\'")}',this.checked)" style="accent-color:var(--rose);width:15px;height:15px;flex-shrink:0">
+      <span style="font-size:13px;color:var(--text)">${c.name}</span>
+    </label>`;
+  }).join('');
+}
+
+function filterRisorseClients(q){renderRisorseClientList(q);}
+
+function toggleRisorseClient(id,name,checked){
+  if(checked){
+    if(!_risorseSelectedClients.some(s=>s.id===id)) _risorseSelectedClients.push({id,name});
+  } else {
+    _risorseSelectedClients=_risorseSelectedClients.filter(s=>s.id!==id);
+  }
+  renderRisorseChips();
+  renderRisorseClientList(document.getElementById('res-clienti-search')?.value||'');
+}
+
+function renderRisorseChips(){
+  const el=document.getElementById('res-clienti-chips');if(!el)return;
+  if(!_risorseSelectedClients.length){
+    el.innerHTML='<span style="font-size:11px;color:var(--text3);font-style:italic">Nessuna cliente selezionata</span>';return;
+  }
+  el.innerHTML=_risorseSelectedClients.map(s=>`
+    <span style="display:inline-flex;align-items:center;gap:5px;background:var(--rose-pale);color:var(--rose);border-radius:20px;padding:3px 10px;font-size:11px;font-weight:600">
+      ${s.name}
+      <button onclick="toggleRisorseClient('${s.id}','${s.name.replace(/'/g,"\\'")}',false)" style="background:none;border:none;color:var(--rose);cursor:pointer;padding:0;font-size:13px;line-height:1;font-weight:700">×</button>
+    </span>`).join('');
+}
+
 async function addRisorsa(){
   const titolo=document.getElementById('res-titolo').value.trim();
   const url=document.getElementById('res-url').value.trim();
   if(!titolo){toast('❌ Inserisci un titolo');return;}
   if(!url){toast('❌ Inserisci un URL');return;}
+  if(_risorseVisibility==='selected'&&!_risorseSelectedClients.length){
+    toast('❌ Seleziona almeno una cliente, oppure scegli "Tutte le clienti"');return;
+  }
   const tipo=document.getElementById('res-tipo').value;
   const desc=document.getElementById('res-desc').value.trim();
   const emoji=document.getElementById('res-emoji').value;
-  const {error}=await supa.from('risorse').insert({titolo,descrizione:desc,tipo,url,emoji,created_by:user.id});
-  if(error){toast('❌ Errore: '+error.message+' — crea la tabella risorse in Supabase');console.error(error);return;}
+  const cliente_ids=_risorseVisibility==='selected'?_risorseSelectedClients.map(s=>s.id):null;
+  const {error}=await supa.from('risorse').insert({titolo,descrizione:desc,tipo,url,emoji,created_by:user.id,cliente_ids});
+  if(error){toast('❌ Errore: '+error.message);console.error(error);return;}
+  // Reset form
   document.getElementById('res-titolo').value='';
   document.getElementById('res-desc').value='';
   document.getElementById('res-url').value='';
+  _risorseSelectedClients=[];
+  setRisorseVisibility('all');
   toast(`✅ Risorsa "${titolo}" aggiunta!`);
   renderAdminRisorse();
 }
@@ -4238,26 +4329,42 @@ async function renderAdminRisorse(){
   const {data,error}=await supa.from('risorse').select('*').order('created_at',{ascending:false});
   if(error){el.innerHTML='<div style="color:var(--rose);font-size:13px">Errore caricamento — assicurati di aver creato la tabella risorse</div>';return;}
   if(!data?.length){el.innerHTML='<div style="font-size:13px;color:var(--text3);font-style:italic">Nessuna risorsa ancora.</div>';return;}
-  el.innerHTML=data.map(r=>`
+  // Build client name map
+  const nameMap={};clientiList.forEach(c=>nameMap[c.id]=c.name);
+  el.innerHTML=data.map(r=>{
+    const isAll=!r.cliente_ids||!r.cliente_ids.length;
+    const visBadge=isAll
+      ? `<span style="font-size:10px;background:var(--violet-pale);color:var(--violet);padding:2px 8px;border-radius:20px;font-weight:600">🌍 Tutte</span>`
+      : `<span style="font-size:10px;background:var(--rose-pale);color:var(--rose);padding:2px 8px;border-radius:20px;font-weight:600">👥 ${r.cliente_ids.length} cliente${r.cliente_ids.length>1?'':'/'}</span>`;
+    const visNames=isAll?'':`<div style="font-size:11px;color:var(--text3);margin-top:4px">${r.cliente_ids.map(id=>nameMap[id]||id).join(', ')}</div>`;
+    return `
     <details style="margin-bottom:6px;border:1.5px solid var(--border);border-radius:var(--r2);overflow:hidden">
       <summary style="padding:10px 14px;cursor:pointer;background:var(--warm);list-style:none;display:flex;align-items:center;justify-content:space-between;user-select:none">
         <div style="display:flex;align-items:center;gap:8px;min-width:0">
           <span style="font-size:18px;flex-shrink:0">${r.emoji||'📄'}</span>
-          <span style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${r.titolo}</span>
+          <div style="min-width:0">
+            <span style="font-size:13px;font-weight:600;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${r.titolo}</span>
+            ${visNames}
+          </div>
         </div>
-        <span style="font-size:11px;color:var(--text3);flex-shrink:0;margin-left:8px">${r.tipo==='pdf_url'?'PDF':'Link'} ▼</span>
+        <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;margin-left:8px">
+          ${visBadge}
+          <span style="font-size:11px;color:var(--text3)">▼</span>
+        </div>
       </summary>
       <div style="padding:10px 14px;background:var(--bg2)">
         ${r.descrizione?`<div style="font-size:12px;color:var(--text2);margin-bottom:8px">${r.descrizione}</div>`:''}
-        <div style="display:flex;gap:8px;align-items:center">
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
           <a href="${r.url}" target="_blank" class="btn-sm" style="text-decoration:none">Apri ↗</a>
           <button class="btn-danger" onclick="event.preventDefault();delRisorsa('${r.id}')">✕ Elimina</button>
         </div>
       </div>
-    </details>`).join('');
+    </details>`;
+  }).join('');
 }
 
 async function delRisorsa(id){
+  if(!confirm('Eliminare questa risorsa?'))return;
   await supa.from('risorse').delete().eq('id',id);
   renderAdminRisorse();
   toast('Risorsa eliminata');
