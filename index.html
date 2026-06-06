@@ -872,7 +872,7 @@ input,textarea,select{font-family:'DM Sans',sans-serif}
           <div class="stat-card"><div class="stat-icon">📋</div><div class="stat-label">Schede create</div><div class="stat-value" id="adm-schede-n">0</div></div>
         </div>
         <div class="card"><div class="card-title" style="display:flex;justify-content:space-between;align-items:center">Le tue clienti <div style="display:flex;gap:6px;align-items:center"><button class="btn-ghost" style="font-size:12px;padding:6px 10px" onclick="reloadDashboard()" title="Ricarica lista da Supabase">🔄</button><button class="btn-primary" style="font-size:12px;padding:7px 14px" onclick="openInviteModal()">✉️ Invita cliente</button></div></div>
-          <table class="tbl"><thead><tr><th>Nome</th><th>Stato</th><th>Ultimo all.</th><th>Check-in</th><th>Aderenza</th><th>Azioni</th></tr></thead>
+          <table class="tbl"><thead><tr><th>Nome</th><th>Stato</th><th>Ultimo all.</th><th>Check-in</th><th>Azioni</th></tr></thead>
           <tbody id="admin-tbody"></tbody></table>
         </div>
       </div>
@@ -2938,27 +2938,14 @@ async function reloadDashboard(){
   if(profErr){toast('❌ Errore caricamento profili: '+profErr.message);console.error(profErr);return;}
   if(allProfiles?.length){
     const clientIds=allProfiles.map(p=>p.id);
-    const thirty=new Date(Date.now()-30*86400000).toISOString().slice(0,10);
     const sessPromises=clientIds.map(id=>supa.from('sessioni').select('cliente_id,data_sessione').eq('cliente_id',id).eq('completata',true).order('data_sessione',{ascending:false}).limit(1).maybeSingle());
     const ciPromises=clientIds.map(id=>supa.from('checkins').select('cliente_id,data_checkin').eq('cliente_id',id).order('data_checkin',{ascending:false}).limit(1).maybeSingle());
-    const sessCountPromises=clientIds.map(id=>supa.from('sessioni').select('id',{count:'exact',head:true}).eq('cliente_id',id).eq('completata',true).gte('data_sessione',thirty));
-    const schedePromises=clientIds.map(id=>supa.from('schede').select('giorni').eq('cliente_id',id).eq('attiva',true).limit(1).maybeSingle());
-    const [sessResults,ciResults,sessCountResults,schedeResults]=await Promise.all([Promise.all(sessPromises),Promise.all(ciPromises),Promise.all(sessCountPromises),Promise.all(schedePromises)]);
-    const lastSessionMap={};const lastCiMap={};const sessCountMap={};const schedaMap={};
+    const [sessResults,ciResults]=await Promise.all([Promise.all(sessPromises),Promise.all(ciPromises)]);
+    const lastSessionMap={};const lastCiMap={};
     sessResults.forEach(r=>{if(r.data)lastSessionMap[r.data.cliente_id]=r.data.data_sessione;});
     ciResults.forEach(r=>{if(r.data)lastCiMap[r.data.cliente_id]=r.data.data_checkin;});
-    sessCountResults.forEach((r,i)=>{sessCountMap[clientIds[i]]=r.count||0;});
-    schedeResults.forEach((r,i)=>{schedaMap[clientIds[i]]=r.data;});
     const fmt=(d)=>{if(!d)return '—';const dt=new Date(d);const days=Math.floor((new Date()-dt)/86400000);if(days===0)return 'Oggi';if(days===1)return 'Ieri';return days+' gg fa';};
-    const calcAd=(id)=>{
-      const done=sessCountMap[id]||0;
-      const gg=schedaMap[id]?.giorni;
-      const giorni=Array.isArray(gg)?gg:(gg?.giorni||[]);
-      const allenamenti=giorni.filter(g=>(g.esercizi||[]).length>0).length;
-      const expected=allenamenti>0?Math.round(allenamenti/7*30):12; // ~1 mese
-      return Math.min(100,Math.round((done/Math.max(expected,1))*100));
-    };
-    clientiList=allProfiles.map(p=>({id:p.id,name:((p.nome||'')+(p.cognome?' '+p.cognome:'')).trim()||p.email||'Cliente',email:p.email||'',stato:'attiva',lastW:fmt(lastSessionMap[p.id]),lastCI:fmt(lastCiMap[p.id]),ad:calcAd(p.id)}));
+    clientiList=allProfiles.map(p=>({id:p.id,name:((p.nome||'')+(p.cognome?' '+p.cognome:'')).trim()||p.email||'Cliente',email:p.email||'',stato:'attiva',lastW:fmt(lastSessionMap[p.id]),lastCI:fmt(lastCiMap[p.id]),ad:0}));
   } else {
     clientiList=[];
     if(!profErr) toast('⚠️ Nessun profilo cliente trovato — controlla le policy RLS su Supabase');
@@ -2978,12 +2965,6 @@ async function renderAdminDash(){
     <td><span style="font-size:10px;color:var(--text3)">Stato: </span><span class="badge ${c.stato==='attiva'?'badge-green':c.stato==='pausa'?'badge-red':'badge-violet'}">${c.stato}</span></td>
     <td><span style="font-size:10px;color:var(--text3)">Ult. all.: </span>${c.lastW}</td>
     <td><span style="font-size:10px;color:var(--text3)">Check-in: </span>${c.lastCI}</td>
-    <td><div style="display:flex;align-items:center;gap:6px">
-      <div style="flex:1;height:6px;background:var(--warmb);border-radius:3px;overflow:hidden;min-width:40px">
-        <div style="height:100%;width:${c.ad}%;background:${c.ad>=75?'var(--sage)':c.ad>=40?'var(--rose)':'#e05050'};border-radius:3px;transition:width 0.4s ease"></div>
-      </div>
-      <span style="font-size:12px;font-weight:600;color:${c.ad>=75?'var(--sage)':c.ad>=40?'var(--rose)':'#e05050'};white-space:nowrap">${c.ad}%</span>
-    </div></td>
     <td><div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:4px"><button class="btn-sm" onclick="navigate('admin-chat')">💬</button><button class="btn-violet" onclick="navigate('admin-schede')">📋</button><button class="btn-ghost view-client-btn" data-id="${c.id}" data-name="${c.name.replace(/"/g,'&quot;')}">👁 Profilo</button><button class="btn-danger" style="font-size:11px;padding:4px 8px" onclick="deleteCliente('${c.id}','${c.name.replace(/'/g,"\\'")}')">🗑</button></div></td>
   </tr>`).join('');}
 
