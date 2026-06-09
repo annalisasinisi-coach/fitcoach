@@ -1555,9 +1555,9 @@ async function afterLogin(supaUser) {
   // Load real data
   await loadUserData();
   navigate(role==='admin'?'admin-dashboard':'home');
-  setupRealtimeChat(); // both coach and client need realtime
   // Reset notification state for fresh session
   notifState.counts={};sectionLastVisit={};lastPollTime=null;_realtimeInitialized=false;
+  setupRealtimeChat(); // both coach and client need realtime
   startPolling();
   // Cleanup automatico dati vecchi — gira in background, non blocca il login
   setTimeout(()=>runAutoCleanup(), 5000);
@@ -2113,7 +2113,7 @@ async function renderDayContentInto(idx, el){
                 <div class="ex-hrow"><div class="ex-num">${gi+1}</div><div class="ex-name">${gex.name}</div><button class="ex-check-btn ${done?'done':''}" onclick="toggleEx('${key}',this,'card_ex_${idx}_${gi}')">${done?'✓':''}</button></div>
                 <div class="ex-meta">${gex.sets} serie × ${gex.reps} | Recupero: ${gex.recupero||'—'}${gex.rpe!=null?' | RPE: '+gex.rpe:''}${gex.tecnica?' | '+gex.tecnica:''}</div>
                 ${libGex?.desc?`<div class="ex-note-inline">💡 ${libGex.desc}</div>`:''}${gex.note?`<div class="ex-note-inline">📌 ${gex.note}</div>`:''}
-                <div class="weight-row"><label>💪 Peso:</label><input class="weight-inp" type="number" id="w_${key}" step="0.5" placeholder="${lastKg||'kg'}" value="${lastKg}"><span style="font-size:12px;color:var(--text2)">kg</span><button class="btn-sm" onclick="saveWeight('${gex.name}','${key}')">Salva</button>${stored?`<button class="btn-ghost" onclick="navigate('progressi')">📈</button>`:''}</div>
+                <div class="weight-row"><label>💪 Peso:</label><input class="weight-inp" type="number" id="w_${key}" step="0.5" placeholder="${lastKg||'kg'}" value="${lastKg}"><span style="font-size:12px;color:var(--text2)">kg</span><button class="btn-sm" onclick="saveWeight('${gex.name}','${key}')">Salva</button>${stored?`<button class="btn-ghost" onclick="curEx='${gex.name}';navigate('progressi')">📈</button>`:''}</div>
               </div></div>
               <div class="ex-bottom"><div class="series-row">${Array.from({length:gex.sets},(_,j)=>{const sd2=ls(`s_${key}_${j}`,{done:false,kg:''});return `<div class="series-pill ${sd2.done?'done':''}" onclick="toggleSeries('${key}',${j},this)"><div class="sp-label">Serie ${j+1}</div><div class="sp-val">${sd2.done&&sd2.kg?`✓ ${sd2.kg}kg`:gex.reps}</div></div>`;}).join('')}</div>
               <div class="fb-row"><div class="fb-label">Come è andata?</div><div class="emoji-row">${['😤','😊','😰','🔥','💀'].map(e=>`<button class="emoji-btn ${fb.emoji===e?'selected':''}" onclick="selEmoji('${key}','${e}',this)">${e}</button>`).join('')}</div><textarea class="fb-textarea" id="ftxt_${key}" placeholder="Note sull'esercizio...">${fb.text}</textarea><button class="btn-sm" style="margin-top:6px" onclick="saveFb('${key}')">Salva feedback</button></div></div>
@@ -2134,7 +2134,7 @@ async function renderDayContentInto(idx, el){
             <div class="ex-meta">${ex.sets} serie × ${ex.reps} | Recupero: ${ex.recupero||'—'}${ex.rpe!=null?' | RPE: '+ex.rpe:''}${ex.tecnica?' | '+ex.tecnica:''}</div>
             ${libEx?.desc?`<div class="ex-note-inline">💡 ${libEx.desc}</div>`:''}${ex.note?`<div class="ex-note-inline">📌 ${ex.note}</div>`:''}
             <div style="flex:1"></div>
-            <div class="weight-row"><label>💪 Peso:</label><input class="weight-inp" type="number" id="w_${key}" step="0.5" placeholder="${lastKg||'kg'}" value="${lastKg}"><span style="font-size:12px;color:var(--text2)">kg</span><button class="btn-sm" onclick="saveWeight('${ex.name}','${key}')">Salva</button>${stored?`<button class="btn-ghost" onclick="navigate('progressi')">📈</button>`:''}</div>
+            <div class="weight-row"><label>💪 Peso:</label><input class="weight-inp" type="number" id="w_${key}" step="0.5" placeholder="${lastKg||'kg'}" value="${lastKg}"><span style="font-size:12px;color:var(--text2)">kg</span><button class="btn-sm" onclick="saveWeight('${ex.name}','${key}')">Salva</button>${stored?`<button class="btn-ghost" onclick="curEx='${ex.name}';navigate('progressi')">📈</button>`:''}</div>
           </div></div>
           <div class="ex-bottom"><div class="series-row">${Array.from({length:ex.sets},(_,j)=>{const sd2=ls(`s_${key}_${j}`,{done:false,kg:''});return `<div class="series-pill ${sd2.done?'done':''}" onclick="toggleSeries('${key}',${j},this)"><div class="sp-label">Serie ${j+1}</div><div class="sp-val">${sd2.done&&sd2.kg?`✓ ${sd2.kg}kg`:ex.reps}</div></div>`;}).join('')}</div>
           <div class="fb-row"><div class="fb-label">Come è andata?</div><div class="emoji-row">${['😤','😊','😰','🔥','💀'].map(e=>`<button class="emoji-btn ${fb.emoji===e?'selected':''}" onclick="selEmoji('${key}','${e}',this)">${e}</button>`).join('')}</div><textarea class="fb-textarea" id="ftxt_${key}" placeholder="Note sull'esercizio...">${fb.text}</textarea><button class="btn-sm" style="margin-top:6px" onclick="saveFb('${key}')">Salva feedback</button></div></div>
@@ -2653,7 +2653,7 @@ function renderQBlock(q,answers,prefix){
 
 // Q save helpers (auto-save on every interaction)
 function qSave(prefix,qid,val){
-  if(prefix==='an'){anamnesiAnswers[qid]=val;ss('anamnesi',anamnesiAnswers);}
+  if(prefix==='an'){anamnesiAnswers[qid]=val;ss('anamnesi',anamnesiAnswers);updateAnamnesiProgress();}
   else{checkAnswers[qid]=val;ss('checkAnswers',checkAnswers);updateCiProgress();}
 }
 function qSaveRadio(label,prefix,qid,val){
@@ -2687,7 +2687,18 @@ async function selectFreq(btn,id,val,prefix){btn.closest('.q-freq-group').queryS
 function renderAnamnesi(){
   const el=document.getElementById('anamnesi-container');
   if(!el)return;
-  el.innerHTML=ANAMNESI_QUESTIONS.map(q=>renderQBlock(q,anamnesiAnswers,'an')).join('')+`<div style="margin-top:20px;padding:16px;background:linear-gradient(135deg,rgba(232,82,122,0.10),rgba(248,221,230,0.55));border:2px solid rgba(232,82,122,0.30);border-radius:12px;font-size:13px;line-height:1.7;color:var(--text)">❤️&nbsp;<strong>Ricordati:</strong> inviami le <strong>fotografie iniziali</strong> (fronte, retro e laterali) su <strong>WhatsApp</strong>, carica <strong>peso e misure</strong> nella sezione <em>Check-in mensile → Misure</em> e prenota la tua <strong>consulenza iniziale</strong> dall’apposita sezione <em>“Prenota chiamata”</em> del menu.</div>`;
+  const total=ANAMNESI_QUESTIONS.filter(q=>q.type!=='file_note').length;
+  const filled=ANAMNESI_QUESTIONS.filter(q=>q.type!=='file_note'&&anamnesiAnswers[q.id]!==undefined&&anamnesiAnswers[q.id]!=='').length;
+  const pct=total>0?Math.round(filled/total*100):0;
+  const progBar=`<div id="an-prog-wrap" style="position:sticky;top:0;z-index:10;background:var(--bg);padding:10px 0 6px;margin-bottom:8px;border-bottom:1px solid var(--border)"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px"><span style="font-size:12px;color:var(--text2);font-weight:500">📋 Anamnesi</span><span style="font-size:12px;color:var(--rose);font-weight:700" id="an-prog-label">${filled} di ${total} compilate</span></div><div style="background:var(--warmb);border-radius:20px;height:5px;overflow:hidden"><div id="an-prog-bar" style="height:100%;border-radius:20px;background:linear-gradient(90deg,var(--rose),var(--violet));transition:width 0.4s ease;width:${pct}%"></div></div></div>`;
+  el.innerHTML=progBar+ANAMNESI_QUESTIONS.map(q=>renderQBlock(q,anamnesiAnswers,'an')).join('')+`<div style="margin-top:20px;padding:16px;background:linear-gradient(135deg,rgba(232,82,122,0.10),rgba(248,221,230,0.55));border:2px solid rgba(232,82,122,0.30);border-radius:12px;font-size:13px;line-height:1.7;color:var(--text)">❤️&nbsp;<strong>Ricordati:</strong> inviami le <strong>fotografie iniziali</strong> (fronte, retro e laterali) su <strong>WhatsApp</strong>, carica <strong>peso e misure</strong> nella sezione <em>Check-in mensile → Misure</em> e prenota la tua <strong>consulenza iniziale</strong> dall'apposita sezione <em>"Prenota chiamata"</em> del menu.</div>`;
+}
+function updateAnamnesiProgress(){
+  const total=ANAMNESI_QUESTIONS.filter(q=>q.type!=='file_note').length;
+  const filled=ANAMNESI_QUESTIONS.filter(q=>q.type!=='file_note'&&anamnesiAnswers[q.id]!==undefined&&anamnesiAnswers[q.id]!=='').length;
+  const pct=total>0?Math.round(filled/total*100):0;
+  const bar=document.getElementById('an-prog-bar');if(bar)bar.style.width=pct+'%';
+  const lbl=document.getElementById('an-prog-label');if(lbl)lbl.textContent=filled+' di '+total+' compilate';
 }
 function renderCheckQ(prevAnswers){
   prevAnswers=prevAnswers||{};
@@ -2993,9 +3004,9 @@ async function addExBuilder(btn){
   div.innerHTML=`<div class="ex-builder-row">
     <div class="eb-drag-handle" title="Trascina per riordinare">⠿</div>
     <div class="field eb-field-name" style="flex:2;min-width:120px"><label>Esercizio</label><div style="position:relative"><input type="text" class="eb-name" placeholder="Nome esercizio" list="ex-datalist" oninput="checkExVideo(this)"><span class="eb-vid-dot" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);font-size:13px;cursor:default;pointer-events:none" title="Nessun video">⚪</span></div></div>
-    <div class="field eb-field-sets" style="max-width:55px"><label>Serie</label><input type="number" class="eb-sets" value="3" min="1" style="background:var(--warm);border:1.5px solid var(--border);border-radius:var(--r);padding:7px 6px;color:var(--text);font-size:13px;outline:none;text-align:center"></div>
-    <div class="field eb-field-reps" style="max-width:70px"><label>Rip.</label><input type="text" class="eb-reps" value="10-12" style="background:var(--warm);border:1.5px solid var(--border);border-radius:var(--r);padding:7px 6px;color:var(--text);font-size:13px;outline:none"></div>
-    <div class="field eb-field-rec" style="max-width:62px"><label>Recup.</label><input type="text" class="eb-rec" value="90s" style="background:var(--warm);border:1.5px solid var(--border);border-radius:var(--r);padding:7px 6px;color:var(--text);font-size:13px;outline:none"></div>
+    <div class="field eb-field-sets" style="max-width:55px"><label>Serie</label><input type="number" class="eb-sets" min="1" placeholder="—" style="background:var(--warm);border:1.5px solid var(--border);border-radius:var(--r);padding:7px 6px;color:var(--text);font-size:13px;outline:none;text-align:center"></div>
+    <div class="field eb-field-reps" style="max-width:70px"><label>Rip.</label><input type="text" class="eb-reps" placeholder="—" style="background:var(--warm);border:1.5px solid var(--border);border-radius:var(--r);padding:7px 6px;color:var(--text);font-size:13px;outline:none"></div>
+    <div class="field eb-field-rec" style="max-width:62px"><label>Recup.</label><input type="text" class="eb-rec" placeholder="—" style="background:var(--warm);border:1.5px solid var(--border);border-radius:var(--r);padding:7px 6px;color:var(--text);font-size:13px;outline:none"></div>
     <div class="field eb-field-rpe" style="max-width:55px"><label>RPE</label><input type="number" class="eb-rpe" min="1" max="10" placeholder="—" style="background:var(--warm);border:1.5px solid var(--border);border-radius:var(--r);padding:7px 6px;color:var(--text);font-size:13px;outline:none;text-align:center"></div>
     <div class="field eb-field-tecnica" style="max-width:155px"><label>Tecnica</label><div style="position:relative">
       <input type="text" class="eb-tecnica" placeholder="— cerca o digita" list="tecnica-list" oninput="filterTecnicaDropdown(this)" onfocus="showTecnicaDrop(this)" style="width:100%;background:var(--warm);border:1.5px solid var(--border);border-radius:var(--r);padding:6px 6px 6px 6px;color:var(--text);font-size:12px;outline:none">
@@ -3003,7 +3014,7 @@ async function addExBuilder(btn){
     </div></div>
     <div class="field eb-field-tipogruppo" style="max-width:90px"><label>Gruppo</label><select class="eb-tipo-gruppo" style="background:var(--warm);border:1.5px solid var(--border);border-radius:var(--r);padding:7px 5px;color:var(--text);font-size:12px;outline:none"><option value="">—</option><option value="superset">Superset</option><option value="triset">Triset</option><option value="circuit">Circuito</option></select></div>
     <div class="field eb-field-gruppo" style="max-width:44px"><label>Lett.</label><input type="text" class="eb-gruppo" maxlength="2" placeholder="A" style="background:var(--warm);border:1.5px solid var(--border);border-radius:var(--r);padding:7px 6px;color:var(--text);font-size:13px;outline:none;text-align:center;text-transform:uppercase"></div>
-    <div class="field eb-field-note" style="flex:2;min-width:100px"><label>Note</label><input type="text" class="eb-note" placeholder="Note tecniche..." style="background:var(--warm);border:1.5px solid var(--border);border-radius:var(--r);padding:7px 6px;color:var(--text);font-size:13px;outline:none"></div>
+    <div class="field eb-field-note" style="flex:2;min-width:100px"><label>Note</label><textarea class="eb-note" placeholder="Note tecniche..." rows="2" style="background:var(--warm);border:1.5px solid var(--border);border-radius:var(--r);padding:7px 6px;color:var(--text);font-size:13px;outline:none;resize:vertical;overflow-y:auto;min-height:36px;width:100%;font-family:inherit"></textarea></div>
     <button onclick="this.closest('.ex-builder').remove()" style="background:transparent;border:none;color:var(--text3);font-size:16px;cursor:pointer;align-self:flex-end;margin-bottom:12px;padding:4px">×</button>
   </div>`;
   c.appendChild(div);updateDatalist();initBuilderDrag(c);
@@ -3013,6 +3024,7 @@ function initBuilderDrag(container){
   container._dragInit=true;
   let dragged=null;
   container.addEventListener('dragstart',e=>{
+    if(e.target.closest('input,textarea,select'))return e.preventDefault();
     const eb=e.target.closest('.ex-builder');if(!eb)return;
     dragged=eb;setTimeout(()=>{if(dragged)dragged.style.opacity='0.4';},0);
   });
@@ -3340,7 +3352,7 @@ function collectGiorni(){
       const n=ex.querySelector('.eb-name')?.value?.trim();if(!n)return;
       const rpeVal=ex.querySelector('.eb-rpe')?.value;
       const tecnicaVal=ex.querySelector('.eb-tecnica')?.value?.trim()||'';
-      esercizi.push({name:n,sets:parseInt(ex.querySelector('.eb-sets')?.value)||3,reps:ex.querySelector('.eb-reps')?.value||'10',recupero:ex.querySelector('.eb-rec')?.value||'90s',rpe:rpeVal!==''?parseInt(rpeVal):null,tecnica:tecnicaVal,note:ex.querySelector('.eb-note')?.value||'',gruppo:ex.querySelector('.eb-gruppo')?.value?.toUpperCase()||'',tipoGruppo:ex.querySelector('.eb-tipo-gruppo')?.value||''});
+      esercizi.push({name:n,sets:parseInt(ex.querySelector('.eb-sets')?.value)||0,reps:ex.querySelector('.eb-reps')?.value||'',recupero:ex.querySelector('.eb-rec')?.value||'',rpe:rpeVal!==''?parseInt(rpeVal):null,tecnica:tecnicaVal,note:ex.querySelector('.eb-note')?.value||'',gruppo:ex.querySelector('.eb-gruppo')?.value?.toUpperCase()||'',tipoGruppo:ex.querySelector('.eb-tipo-gruppo')?.value||''});
     });
     giorni.push({label:d.querySelector('.db-label')?.value||'Giorno',nome:d.querySelector('.db-nome')?.value||'',tipo:d.querySelector('.db-tipo')?.value||'allenamento',note:d.querySelector('.db-note')?.value||'',esercizi});
   });
