@@ -1559,6 +1559,8 @@ async function runAutoCleanup(){
   const now=Date.now();
   if(last && (now-parseInt(last)) < 30*24*60*60*1000) return;
   const cutoff=new Date(now - 2*365*24*60*60*1000).toISOString();
+  // logs: sono solo diagnostica, non dati della cliente — cutoff più corto (6 mesi)
+  const cutoffLogs=new Date(now - 6*30*24*60*60*1000).toISOString();
   try{
     // feedback_esercizi: mai letti dal DB — eliminazione sicura
     await supa.from('feedback_esercizi').delete().lt('created_at',cutoff);
@@ -1568,8 +1570,10 @@ async function runAutoCleanup(){
     if(role==='admin'||role==='coach'){
       await supa.from('sessioni').delete().lt('data_sessione',cutoff.slice(0,10));
     }
+    // log di errore/diagnostica: oltre 6 mesi non servono più
+    await supa.from('logs').delete().lt('timestamp',cutoffLogs);
     localStorage.setItem(CLEANUP_KEY, String(now));
-    console.log('[CLEANUP] completato, cutoff:',cutoff.slice(0,10));
+    console.log('[CLEANUP] completato, cutoff:',cutoff.slice(0,10),'| logs cutoff:',cutoffLogs.slice(0,10));
   }catch(e){
     console.warn('[CLEANUP] Errore (non critico):',e.message);
   }
